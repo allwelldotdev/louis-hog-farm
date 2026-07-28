@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: hogfarm
+      POSTGRES_PASSWORD: hogfarm
+      POSTGRES_DB: hogfarm
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hogfarm -d hogfarm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hogfarm:hogfarm@db:5432/hogfarm
+      JWT_SECRET: dev-only-change-in-production
+      JWT_ACCESS_EXPIRE_MINUTES: "30"
+      JWT_REFRESH_EXPIRE_DAYS: "7"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
