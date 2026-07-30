@@ -16,6 +16,7 @@ from app.seed.profiles import (
     DEMO_EMAIL,
     DEMO_FARM_NAME,
     EXTRA_FARM_NAMES,
+    SeedConflict,
     SeedResult,
     seed_farm,
 )
@@ -39,6 +40,13 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
+    try:
+        _run(args)
+    except SeedConflict as exc:
+        raise SystemExit(f"\nSeed aborted: {exc}\n") from None
+
+
+def _run(args: argparse.Namespace) -> None:
     farms = 1 if args.profile == "demo" else max(1, args.farms)
     hogs = 20 if args.profile == "demo" else args.hogs
 

@@ -60,9 +60,7 @@ class TestAuth:
 def _make_hog(client: TestClient, auth: dict[str, Any], **over: Any) -> dict[str, Any]:
     body = {"tag_number": "H-1", "birth_date": "2025-01-01", "breed": "Duroc"}
     body.update(over)
-    created: dict[str, Any] = client.post(
-        f"{API}/hogs", json=body, headers=auth["headers"]
-    ).json()
+    created: dict[str, Any] = client.post(f"{API}/hogs", json=body, headers=auth["headers"]).json()
     return created
 
 

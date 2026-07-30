@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -43,6 +43,10 @@ EXTRA_FARM_NAMES = [
     "Oak Ridge Swine Co.",
     "Sunrise Agro Farms",
 ]
+
+
+class SeedConflict(RuntimeError):
+    """Raised when seeding would collide with data already in the farm."""
 
 
 @dataclass(frozen=True)
@@ -113,6 +117,17 @@ def seed_farm(
     ensure_alert_rules(db, farm)
     if reset:
         wipe_farm_data(db, farm.id)
+    else:
+        # Tags are generated deterministically from the herd plan, so seeding a
+        # farm that already holds animals collides on the active-tag unique
+        # index. Say so plainly rather than surfacing an IntegrityError.
+        existing = db.scalar(select(func.count()).select_from(Hog).where(Hog.farm_id == farm.id))
+        if existing:
+            raise SeedConflict(
+                f"{farm.name!r} already has {existing} hogs. "
+                f"Re-run with --reset to replace its records, "
+                f"or use a different --seed and farm name to add another farm."
+            )
 
     today = date.today()
     start = today - timedelta(days=days - 1)
