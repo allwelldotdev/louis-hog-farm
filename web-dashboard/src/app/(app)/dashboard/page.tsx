@@ -1,4 +1,5 @@
 import { FarmOverview } from '@/components/dashboard/farm-overview'
+import { KpiRow } from '@/components/dashboard/kpi-row'
 
 export default function DashboardPage() {
   return (
@@ -8,6 +9,7 @@ export default function DashboardPage() {
         <h1 className="text-xl font-semibold tracking-tight text-ink">Dashboard</h1>
       </div>
 
+      <KpiRow />
       <FarmOverview />
     </div>
   )

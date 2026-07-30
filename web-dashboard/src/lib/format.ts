@@ -7,6 +7,15 @@
  */
 
 /**
+ * What a figure reads as when the backend has nothing to report.
+ *
+ * A null KPI means "not measured" — no gain recorded, nothing weighed — which
+ * is a different claim from zero, and rendering it as `0` would report a herd
+ * that gained nothing when the truth is that nobody weighed it.
+ */
+export const NO_VALUE = '—'
+
+/**
  * Parse a `YYYY-MM-DD` business date as local midnight.
  *
  * `new Date('2026-07-30')` parses bare ISO dates as **UTC** midnight, so at any
@@ -27,7 +36,7 @@ export function formatBusinessDate(
 }
 
 export function formatMoney(value: number | null | undefined, currency: string): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return NO_VALUE
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency,
@@ -36,7 +45,7 @@ export function formatMoney(value: number | null | undefined, currency: string):
 }
 
 export function formatNumber(value: number | null | undefined, fractionDigits = 2): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return NO_VALUE
   return new Intl.NumberFormat(undefined, {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
@@ -44,12 +53,12 @@ export function formatNumber(value: number | null | undefined, fractionDigits = 
 }
 
 export function formatInteger(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return NO_VALUE
   return new Intl.NumberFormat().format(value)
 }
 
 export function formatPercent(value: number | null | undefined, fractionDigits = 1): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return NO_VALUE
   return `${value.toFixed(fractionDigits)}%`
 }
 
