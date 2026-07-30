@@ -1,0 +1,139 @@
+"""Pure tests. No database, so these always run."""
+
+import random
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
+
+from app.core.time import as_utc, utc_now
+from app.models.hog import ProductionClass
+from app.seed import generators as gen
+from app.services.dashboard_metrics import HogWeightEndpoints, compute_adg_rows
+
+
+def _endpoints(first_kg: str, last_kg: str, span_days: int, hog_id: int = 1) -> HogWeightEndpoints:
+    start = date(2026, 1, 1)
+    return HogWeightEndpoints(
+        hog_id=hog_id,
+        tag_number=f"T-{hog_id}",
+        breed="Large White",
+        production_class=ProductionClass.grower,
+        first_date=start,
+        first_weight_kg=Decimal(first_kg),
+        last_date=start + timedelta(days=span_days),
+        last_weight_kg=Decimal(last_kg),
+    )
+
+
+class TestComputeAdg:
+    def test_positive_gain(self) -> None:
+        (row,) = compute_adg_rows([_endpoints("50.0", "80.0", 30)])
+        assert row.weight_gain_kg == 30.0
+        assert row.adg_kg_per_day == 1.0
+        assert row.days == 30
+
+    def test_weight_loss_yields_negative_adg(self) -> None:
+        (row,) = compute_adg_rows([_endpoints("80.0", "50.0", 30)])
+        assert row.adg_kg_per_day < 0
+
+    def test_zero_day_span_is_skipped_not_divided_by_zero(self) -> None:
+        # A hog weighed once, or several times on one day, has no measurable
+        # rate. Returning 0 would be a fabricated value.
+        assert compute_adg_rows([_endpoints("50.0", "55.0", 0)]) == []
+
+    def test_empty_input(self) -> None:
+        assert compute_adg_rows([]) == []
+
+    def test_each_hog_produces_one_row(self) -> None:
+        rows = compute_adg_rows([_endpoints("50.0", "80.0", 30, hog_id=i) for i in range(1, 6)])
+        assert len(rows) == 5
+        assert {r.hog_id for r in rows} == {1, 2, 3, 4, 5}
+
+
+class TestTimeHelpers:
+    def test_as_utc_attaches_tz_to_naive(self) -> None:
+        naive = datetime(2026, 7, 30, 12, 0, 0)
+        result = as_utc(naive)
+        assert result is not None and result.tzinfo is not None
+
+    def test_as_utc_none_passthrough(self) -> None:
+        assert as_utc(None) is None
+
+    def test_naive_value_becomes_comparable(self) -> None:
+        """The exact failure behind audit d: this comparison used to raise."""
+        normalised = as_utc(datetime(2026, 7, 30, 12, 0, 0))
+        assert normalised is not None
+        assert normalised > utc_now() - timedelta(days=3650)
+
+    def test_aware_value_is_normalised_not_shifted(self) -> None:
+        aware = datetime(2026, 7, 30, 12, 0, 0, tzinfo=UTC)
+        assert as_utc(aware) == aware
+
+
+class TestGrowthGenerator:
+    """Permanent guard against audit g — seeded weight running backwards."""
+
+    def test_weight_never_decreases_for_healthy_archetype(self) -> None:
+        rng = random.Random(1)
+        plan = gen.HogPlan(
+            tag_number="T-1",
+            breed="Duroc",
+            sex=gen.HogSex.female,
+            production_class=ProductionClass.grower,
+            birth_date=date(2026, 1, 1),
+            archetype=gen.Archetype.healthy,
+            start_weight_kg=40.0,
+            vigour=1.0,
+        )
+        series = gen.build_series(plan, date(2026, 4, 1), 90, rng)
+        weights = [p.weight_kg for p in series.points]
+        assert weights[-1] > weights[0]
+
+    def test_whole_demo_herd_gains_weight_overall(self) -> None:
+        rng = random.Random(42)
+        plans = gen.plan_herd(rng, 20, 90, "H1")
+        losers = 0
+        for plan in plans:
+            series = gen.build_series(plan, date(2026, 4, 1), 90, rng)
+            if series.points[-1].weight_kg < series.points[0].weight_kg:
+                losers += 1
+        # Decline and mortality archetypes are *meant* to lose condition, but
+        # they must never be the majority.
+        assert losers <= len(plans) // 4
+
+    def test_demo_herd_matches_the_project_description(self) -> None:
+        rng = random.Random(42)
+        plans = gen.plan_herd(rng, 20, 90, "H1")
+        counts: dict[ProductionClass, int] = {}
+        for p in plans:
+            counts[p.production_class] = counts.get(p.production_class, 0) + 1
+        assert counts[ProductionClass.boar] == 1
+        assert counts[ProductionClass.sow] == 2
+        assert counts[ProductionClass.grower] == 3
+        assert counts[ProductionClass.piglet] == 14
+
+    def test_dead_animals_stop_producing_records(self) -> None:
+        rng = random.Random(7)
+        plan = gen.HogPlan(
+            tag_number="T-2",
+            breed="Duroc",
+            sex=gen.HogSex.male,
+            production_class=ProductionClass.piglet,
+            birth_date=date(2026, 1, 1),
+            archetype=gen.Archetype.mortality,
+            start_weight_kg=6.0,
+            vigour=1.0,
+            death_day=40,
+        )
+        series = gen.build_series(plan, date(2026, 4, 1), 90, rng)
+        assert max(p.day_index for p in series.points) <= 40
+
+    def test_same_seed_reproduces_identical_data(self) -> None:
+        """Chapter 4 figures must survive a re-seed."""
+        a = gen.plan_herd(random.Random(42), 20, 90, "H1")
+        b = gen.plan_herd(random.Random(42), 20, 90, "H1")
+        assert [(p.tag_number, p.breed, p.archetype) for p in a] == [
+            (p.tag_number, p.breed, p.archetype) for p in b
+        ]
+
+    def test_archetype_mix_shares_sum_to_one(self) -> None:
+        assert abs(sum(gen.ARCHETYPE_MIX.values()) - 1.0) < 1e-9

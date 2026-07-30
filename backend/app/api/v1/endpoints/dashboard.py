@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date, timedelta
 from typing import Annotated
 
@@ -70,18 +71,26 @@ def get_dashboard_kpis(
         if gain_total > 0 and feed_by_ccy:
             per_kg = float(next(iter(feed_by_ccy.values()))) / gain_total
 
-    # Below 85% of the herd average, floored at 0.35 kg/day so a uniformly poor
-    # herd does not flag everyone as merely "below average".
-    threshold = max(0.35, 0.85 * avg_adg) if avg_adg and avg_adg > 0 else 0.35
+    # Compared against peers in the same production class, not a herd-wide
+    # figure. A piglet gaining 0.2 kg/day is performing normally; judged against
+    # a flat floor it looks like a failure, and on a piglet-heavy herd that
+    # flagged 85% of the animals — a useless signal.
+    by_class: dict[str, list[float]] = defaultdict(list)
+    for r in adg_rows:
+        by_class[r.production_class.value].append(r.adg_kg_per_day)
+    class_threshold = {
+        cls: 0.85 * (sum(values) / len(values)) for cls, values in by_class.items() if values
+    }
     under = [
         UnderperformerRow(
             hog_id=r.hog_id,
             tag_number=r.tag_number,
             breed=r.breed,
+            production_class=r.production_class.value,
             adg_kg_per_day=r.adg_kg_per_day,
         )
         for r in sorted(adg_rows, key=lambda x: x.adg_kg_per_day)[:50]
-        if r.adg_kg_per_day < threshold
+        if r.adg_kg_per_day < class_threshold.get(r.production_class.value, 0.0)
     ]
 
     readiness = market_ready_stats(db, user.farm_id, end, breed, market_weight_kg)

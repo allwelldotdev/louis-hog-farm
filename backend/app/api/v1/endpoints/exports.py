@@ -1,6 +1,7 @@
 import csv
 import io
 from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time
 from typing import Annotated, Any, Literal
@@ -373,13 +374,23 @@ _EXPORTS: dict[str, Callable[[int, date | None, date | None], ExportSpec]] = {
 }
 
 
-def _iter_csv(spec: ExportSpec) -> Iterator[str]:
-    """Yield CSV text in batches, streaming rows out of the database.
+SessionCtx = Callable[[], AbstractContextManager[Session]]
 
-    Opens its own session rather than borrowing the request-scoped one: a
-    generator body runs as the response is streamed, by which point a
-    dependency-managed session may already have been closed.
+
+def get_session_ctx() -> SessionCtx:
+    """Session source for the streaming body.
+
+    A FastAPI `yield` dependency is torn down *before* the response streams, so
+    the generator cannot borrow the request-scoped session — it must open its
+    own. Injecting the factory rather than hard-coding it keeps that correct in
+    production while letting tests supply a session bound to their open
+    transaction.
     """
+    return SessionLocal
+
+
+def _iter_csv(spec: ExportSpec, session_ctx: SessionCtx) -> Iterator[str]:
+    """Yield CSV text in batches, streaming rows out of the database."""
     buf = io.StringIO()
     writer = csv.writer(buf)
 
@@ -392,7 +403,7 @@ def _iter_csv(spec: ExportSpec) -> Iterator[str]:
     writer.writerow(spec.header)
     yield flush()
 
-    with SessionLocal() as db:
+    with session_ctx() as db:
         pending = 0
         for row in db.execute(spec.stmt).yield_per(CHUNK_ROWS):
             writer.writerow(spec.format_row(row))
@@ -408,6 +419,7 @@ def _iter_csv(spec: ExportSpec) -> Iterator[str]:
 def export_csv(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    session_ctx: Annotated[SessionCtx, Depends(get_session_ctx)],
     export_key: ExportKey,
     date_from: date | None = None,
     date_to: date | None = None,
@@ -421,7 +433,7 @@ def export_csv(
     # else with 422 before this body runs.
     spec = _EXPORTS[export_key](user.farm_id, date_from, date_to)
     return StreamingResponse(
-        _iter_csv(spec),
+        _iter_csv(spec, session_ctx),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{export_key}.csv"'},
     )

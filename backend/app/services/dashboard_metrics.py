@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models.feed_record import FeedRecord
 from app.models.health_record import HealthRecord
-from app.models.hog import Hog, HogStatus
+from app.models.hog import Hog, HogStatus, ProductionClass
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,7 @@ class HogWeightEndpoints:
     hog_id: int
     tag_number: str
     breed: str
+    production_class: ProductionClass
     first_date: date
     first_weight_kg: Decimal
     last_date: date
@@ -41,6 +42,7 @@ class HogAdgRow:
     hog_id: int
     tag_number: str
     breed: str
+    production_class: ProductionClass
     adg_kg_per_day: float
     weight_gain_kg: float
     days: int
@@ -107,6 +109,7 @@ def fetch_weight_endpoints_in_range(
         endpoints.c.hog_id,
         Hog.tag_number,
         Hog.breed,
+        Hog.production_class,
         endpoints.c.first_date,
         endpoints.c.first_weight,
         endpoints.c.last_date,
@@ -118,10 +121,11 @@ def fetch_weight_endpoints_in_range(
             hog_id=r[0],
             tag_number=r[1],
             breed=r[2],
-            first_date=r[3],
-            first_weight_kg=Decimal(str(r[4])),
-            last_date=r[5],
-            last_weight_kg=Decimal(str(r[6])),
+            production_class=r[3],
+            first_date=r[4],
+            first_weight_kg=Decimal(str(r[5])),
+            last_date=r[6],
+            last_weight_kg=Decimal(str(r[7])),
         )
         for r in db.execute(stmt).all()
     ]
@@ -144,6 +148,7 @@ def compute_adg_rows(endpoints: list[HogWeightEndpoints]) -> list[HogAdgRow]:
                 hog_id=e.hog_id,
                 tag_number=e.tag_number,
                 breed=e.breed,
+                production_class=e.production_class,
                 adg_kg_per_day=gain / days,
                 weight_gain_kg=gain,
                 days=days,

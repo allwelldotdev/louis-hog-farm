@@ -16,7 +16,8 @@ export
 endif
 
 .PHONY: help env-check install db-up db-down db-wait psql db-reset migrate migrate-down \
-        revision seed api web up up-all down logs build ps lint fmt typecheck test check clean
+        revision seed seed-bulk seed-reset api web up up-all down logs build ps lint fmt \
+        typecheck test check clean
 
 ## ---------------------------------------------------------------- help ----
 
@@ -75,8 +76,15 @@ revision: env-check ## Autogenerate a migration:  make revision m="add widget ta
 	@test -n "$(m)" || { echo 'ERROR: pass a message, e.g. make revision m="add widget"'; exit 1; }
 	cd $(BACKEND) && uv run alembic revision --autogenerate -m "$(m)"
 
-seed: env-check ## Load demo data
-	cd $(BACKEND) && uv run python -m app.seed_demo
+seed: env-check ## Load the demo herd (1 farm, 20 hogs, 90 days)
+	cd $(BACKEND) && uv run python -m app.seed --profile demo --days $(or $(DAYS),90)
+
+seed-bulk: env-check ## Load a large backdated dataset: make seed-bulk FARMS=5 HOGS=60 DAYS=90
+	cd $(BACKEND) && uv run python -m app.seed --profile bulk \
+		--farms $(or $(FARMS),5) --hogs $(or $(HOGS),60) --days $(or $(DAYS),90)
+
+seed-reset: env-check ## Re-seed, wiping each seeded farm's existing records first
+	cd $(BACKEND) && uv run python -m app.seed --profile demo --reset
 
 ## --------------------------------------------------------------- run ----
 

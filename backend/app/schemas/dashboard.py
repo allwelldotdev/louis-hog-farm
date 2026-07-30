@@ -20,6 +20,7 @@ class UnderperformerRow(BaseModel):
     hog_id: int
     tag_number: str
     breed: str
+    production_class: str
     adg_kg_per_day: float
 
 

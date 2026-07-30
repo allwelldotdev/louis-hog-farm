@@ -26,7 +26,14 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return settings.database_url
+    """Explicit `sqlalchemy.url` wins; otherwise fall back to app settings.
+
+    Without the override the test fixture could not point Alembic at the
+    hogfarm_test database — env.py unconditionally replaced the URL and migrated
+    the development database instead.
+    """
+    configured = config.get_main_option("sqlalchemy.url", None)
+    return configured or settings.database_url
 
 
 def run_migrations_offline() -> None:
