@@ -126,8 +126,9 @@ typecheck: ## Typecheck backend (mypy) and dashboard (tsc)
 	cd $(BACKEND) && uv run mypy .
 	cd $(WEB) && npx tsc --noEmit
 
-test: ## Run the backend test suite
+test: ## Run the backend and dashboard test suites
 	cd $(BACKEND) && uv run pytest -q
+	cd $(WEB) && npx vitest run
 
 check: lint typecheck test ## Run everything the Stop-hook quality gate runs
 

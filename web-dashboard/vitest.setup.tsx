@@ -1,0 +1,67 @@
+import { cleanup } from '@testing-library/react'
+import { afterEach, beforeAll } from 'vitest'
+
+/**
+ * jsdom has no layout engine and no `ResizeObserver`, and Recharts'
+ * `ResponsiveContainer` needs both: it subscribes to the container's size and
+ * renders nothing at all until it is told one. Without this, every chart test
+ * asserts against an empty `<div>` and passes for the wrong reason.
+ *
+ * Reporting a fixed size is what makes the *real* container run, so the tests
+ * exercise the component the app ships rather than a stub standing in for it.
+ */
+const TEST_CHART_WIDTH = 600
+const TEST_CHART_HEIGHT = 300
+
+class FixedSizeResizeObserver implements ResizeObserver {
+  constructor(private readonly callback: ResizeObserverCallback) {}
+
+  observe(target: Element): void {
+    const contentRect = {
+      width: TEST_CHART_WIDTH,
+      height: TEST_CHART_HEIGHT,
+      top: 0,
+      left: 0,
+      bottom: TEST_CHART_HEIGHT,
+      right: TEST_CHART_WIDTH,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }
+    this.callback(
+      [
+        {
+          target,
+          contentRect,
+          borderBoxSize: [],
+          contentBoxSize: [],
+          devicePixelContentBoxSize: [],
+        },
+      ],
+      this,
+    )
+  }
+
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+beforeAll(() => {
+  globalThis.ResizeObserver = FixedSizeResizeObserver
+
+  // Recharts also measures through the DOM directly; jsdom reports zero for
+  // both, which collapses the plotting area even once a size is observed.
+  for (const [property, value] of [
+    ['offsetWidth', TEST_CHART_WIDTH],
+    ['offsetHeight', TEST_CHART_HEIGHT],
+    ['clientWidth', TEST_CHART_WIDTH],
+    ['clientHeight', TEST_CHART_HEIGHT],
+  ] as const) {
+    Object.defineProperty(HTMLElement.prototype, property, {
+      configurable: true,
+      value,
+    })
+  }
+})
+
+afterEach(cleanup)
