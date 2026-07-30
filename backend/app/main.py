@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.core.config import settings
 from app.db.migrate import run_migrations
 
 
@@ -21,9 +22,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Wildcard origins combined with allow_credentials is rejected by browsers per
+# the CORS spec, so the previous config was silently ineffective (audit m). The
+# dashboard proxies server-side and never calls this API cross-origin; the list
+# exists for direct /docs access.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,16 +40,3 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
-
-
-if __name__ == "__main__":
-    import os
-    import sys
-
-    import uvicorn
-
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
-
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000)

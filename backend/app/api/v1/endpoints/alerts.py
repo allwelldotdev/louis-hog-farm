@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_alert_rule_in_farm, get_hog_in_farm
 from app.api.deps import CurrentUser, ManagerUser
+from app.core.time import utc_now
 from app.db.session import get_db
 from app.models.alert import Alert, AlertStatus, AlertType
 from app.models.hog import Hog
@@ -89,7 +89,7 @@ def update_alert(
     if body.resolution_notes is not None:
         alert.resolution_notes = body.resolution_notes
     alert.updated_by_user_id = user.id
-    alert.updated_at = datetime.now(UTC)
+    alert.updated_at = utc_now()
     db.add(alert)
     db.commit()
     db.refresh(alert)

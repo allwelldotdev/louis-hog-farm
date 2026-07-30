@@ -1,10 +1,11 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser
+from app.core.time import utc_today
 from app.db.session import get_db
 from app.schemas.dashboard import (
     CurrencyTotal,
@@ -28,7 +29,7 @@ def _default_range(
     date_from: date | None,
     date_to: date | None,
 ) -> tuple[date, date]:
-    today = datetime.now(UTC).date()
+    today = utc_today()
     end = date_to or today
     start = date_from or (end - timedelta(days=90))
     if start > end:

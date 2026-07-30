@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,6 +13,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.core.time import as_utc, utc_now
 from app.db.session import get_db
 from app.models.farm import Farm
 from app.models.user import User, UserRole
@@ -54,14 +55,15 @@ def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
     user = db.scalar(select(User).where(User.email == form.username))
-    now = datetime.now(UTC)
+    now = utc_now()
 
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password"
         )
 
-    if user.locked_until and user.locked_until > now:
+    locked_until = as_utc(user.locked_until)
+    if locked_until and locked_until > now:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked"
         )
@@ -113,6 +115,14 @@ def refresh_token(db: Annotated[Session, Depends(get_db)], body: RefreshRequest)
     user = db.get(User, user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    # Refresh honours the lockout too. Without this a locked account can keep
+    # minting access tokens, which then 403 on every request instead of failing
+    # here where the reason is legible.
+    locked_until = as_utc(user.locked_until)
+    if locked_until and locked_until > utc_now():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked"
+        )
     sub_str = str(user.id)
     return Token(
         access_token=create_access_token(

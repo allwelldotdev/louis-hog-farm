@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser
+from app.core.time import utc_now, utc_today
 from app.db.session import get_db
 from app.models.health_record import HealthRecord
 from app.models.hog import Hog
@@ -15,12 +16,8 @@ from app.schemas.health import HealthRecordCreate, HealthRecordRead, HealthRecor
 router = APIRouter(prefix="/health-records", tags=["health-records"])
 
 
-def _utc_today() -> date:
-    return datetime.now(UTC).date()
-
-
 def _assert_record_date_not_future(d: date) -> None:
-    if d > _utc_today():
+    if d > utc_today():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future"
         )
@@ -107,7 +104,7 @@ def update_health_record(
     if body.notes is not None:
         rec.notes = body.notes
     rec.updated_by_user_id = user.id
-    rec.updated_at = datetime.now(UTC)
+    rec.updated_at = utc_now()
     db.add(rec)
     db.commit()
     db.refresh(rec)

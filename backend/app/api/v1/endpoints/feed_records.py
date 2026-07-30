@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser, is_manager_like
+from app.core.time import utc_now, utc_today
 from app.db.session import get_db
 from app.models.feed_record import FeedRecord
 from app.models.hog import Hog
@@ -18,12 +19,8 @@ router = APIRouter(prefix="/feed-records", tags=["feed-records"])
 FEED_EDIT_GRACE = timedelta(hours=24)
 
 
-def _utc_today() -> date:
-    return datetime.now(UTC).date()
-
-
 def _assert_record_date_not_future(d: date) -> None:
-    if d > _utc_today():
+    if d > utc_today():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future"
         )
@@ -35,7 +32,7 @@ def _assert_can_edit_feed(user: User, rec: FeedRecord) -> None:
         return
     if created.tzinfo is None:
         created = created.replace(tzinfo=UTC)
-    if datetime.now(UTC) - created <= FEED_EDIT_GRACE:
+    if utc_now() - created <= FEED_EDIT_GRACE:
         return
     if is_manager_like(user):
         return
@@ -125,7 +122,7 @@ def update_feed_record(
     if body.currency_code is not None:
         rec.currency_code = body.currency_code.upper()
     rec.updated_by_user_id = user.id
-    rec.updated_at = datetime.now(UTC)
+    rec.updated_at = utc_now()
     db.add(rec)
     db.commit()
     db.refresh(rec)

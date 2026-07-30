@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, ManagerUser
+from app.core.time import utc_now, utc_today
 from app.db.session import get_db
 from app.models.breeding_cycle import BreedingCycle, BreedingStatus
 from app.models.hog import Hog
@@ -15,12 +16,8 @@ from app.schemas.breeding import BreedingCycleCreate, BreedingCycleRead, Breedin
 router = APIRouter(prefix="/breeding-cycles", tags=["breeding-cycles"])
 
 
-def _utc_today() -> date:
-    return datetime.now(UTC).date()
-
-
 def _assert_not_future(d: date) -> None:
-    if d > _utc_today():
+    if d > utc_today():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Date cannot be in the future"
         )
@@ -124,7 +121,7 @@ def update_breeding_cycle(
         if body.notes is not None:
             cycle.notes = body.notes
             cycle.updated_by_user_id = user.id
-            cycle.updated_at = datetime.now(UTC)
+            cycle.updated_at = utc_now()
             db.add(cycle)
             db.commit()
             db.refresh(cycle)
@@ -152,7 +149,7 @@ def update_breeding_cycle(
         cycle.notes = body.notes
 
     cycle.updated_by_user_id = user.id
-    cycle.updated_at = datetime.now(UTC)
+    cycle.updated_at = utc_now()
     db.add(cycle)
     db.commit()
     db.refresh(cycle)

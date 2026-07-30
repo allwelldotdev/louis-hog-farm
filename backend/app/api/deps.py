@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -6,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
+from app.core.time import as_utc, utc_now
 from app.db.session import get_db
 from app.models.user import User, UserRole
 
@@ -35,7 +35,8 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive or not found"
         )
-    if user.locked_until and user.locked_until > datetime.now(UTC):
+    locked_until = as_utc(user.locked_until)
+    if locked_until and locked_until > utc_now():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked"
         )

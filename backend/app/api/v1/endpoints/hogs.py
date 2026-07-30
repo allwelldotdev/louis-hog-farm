@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser, is_manager_like
+from app.core.time import utc_now
 from app.db.session import get_db
 from app.models.hog import Hog, HogStatus
 from app.models.user import UserRole
@@ -131,7 +132,7 @@ def update_hog(
     if body.status is not None:
         hog.status = body.status
     hog.updated_by_user_id = user.id
-    hog.updated_at = datetime.now(UTC)
+    hog.updated_at = utc_now()
     db.add(hog)
     db.commit()
     db.refresh(hog)
