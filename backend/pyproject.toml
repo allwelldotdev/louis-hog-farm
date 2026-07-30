@@ -17,8 +17,9 @@ dependencies = [
     "argon2-cffi==23.1.0",
 ]
 
-# Mirrors requirements.txt above, which is kept as the historical pinned
-# reference. New dependencies should be added via `uv add` from here on.
+# Single source of truth for dependencies. uv.lock pins the resolved versions and
+# is what both the local .venv and the Docker image install from; add new deps
+# with `uv add`, never by hand-editing a parallel requirements file.
 
 [tool.ruff]
 line-length = 100

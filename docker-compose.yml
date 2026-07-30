@@ -1,29 +1,84 @@
+name: hogfarm
+
+# Values interpolated as ${VAR} come from .env (see .env.example).
+# DATABASE_URL is set per service rather than inherited from .env, because the
+# host-side value in .env points at localhost while containers must reach `db`.
+
+x-api-env: &api-env
+  DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-hogfarm}:${POSTGRES_PASSWORD:-hogfarm}@db:5432/${POSTGRES_DB:-hogfarm}
+  # Passed through empty rather than guarded with `:?`. Compose interpolates the
+  # whole file before running any command, so a hard guard here breaks even
+  # `compose ps`, `stop` and `psql` when .env is absent. An empty value fails
+  # fast in the API's own settings validation, and `make env-check` catches it
+  # earlier with a friendlier message.
+  JWT_SECRET: ${JWT_SECRET:-}
+  JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+  JWT_ACCESS_EXPIRE_MINUTES: ${JWT_ACCESS_EXPIRE_MINUTES:-30}
+  JWT_REFRESH_EXPIRE_DAYS: ${JWT_REFRESH_EXPIRE_DAYS:-7}
+  APP_ENV: ${APP_ENV:-dev}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  TZ: UTC
+
 services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: hogfarm
-      POSTGRES_PASSWORD: hogfarm
-      POSTGRES_DB: hogfarm
+      POSTGRES_USER: ${POSTGRES_USER:-hogfarm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hogfarm}
+      POSTGRES_DB: ${POSTGRES_DB:-hogfarm}
+      # UTC in the container so now() server-defaults are unambiguous. Business
+      # dates are stored as DATE and are unaffected.
+      TZ: UTC
+      PGTZ: UTC
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hogfarm -d hogfarm"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hogfarm} -d ${POSTGRES_DB:-hogfarm}"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+
+  # One-shot. Runs to completion and exits, so the api workers can never race
+  # each other to migrate at boot.
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
 
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
+    environment: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/ready').status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # Optional database inspector: `docker compose --profile tools up -d adminer`
+  adminer:
+    image: adminer:5
+    profiles: ["tools"]
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
     environment:
-      DATABASE_URL: postgresql+psycopg2://hogfarm:hogfarm@db:5432/hogfarm
-      JWT_SECRET: dev-only-change-in-production
-      JWT_ACCESS_EXPIRE_MINUTES: "30"
-      JWT_REFRESH_EXPIRE_DAYS: "7"
+      ADMINER_DEFAULT_SERVER: db
     depends_on:
       db:
         condition: service_healthy
