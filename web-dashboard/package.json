@@ -14,7 +14,9 @@
     "types": "openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api/schema.d.ts"
   },
   "dependencies": {
+    "@tanstack/query-sync-storage-persister": "^5.101.4",
     "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-query-persist-client": "^5.101.4",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

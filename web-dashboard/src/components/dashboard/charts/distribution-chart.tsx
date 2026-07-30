@@ -12,6 +12,7 @@ import {
   TooltipShell,
 } from '@/components/dashboard/charts/chart-primitives'
 import { useBreedDistribution, useProductionClassDistribution } from '@/hooks/use-dashboard'
+import { useDashboardFilters } from '@/hooks/use-dashboard-filters'
 import type { Distribution } from '@/lib/api/types'
 import { formatInteger, formatNumber, formatPercent, humanize } from '@/lib/format'
 
@@ -39,11 +40,26 @@ export const PRODUCTION_CLASS_ORDER = [
   'boar',
 ] as const
 
+/**
+ * Neither grouping is breed-filtered — the API does not accept `breed` on
+ * either route, and for the breed chart it would be incoherent anyway, since it
+ * is the facet the filter is chosen from.
+ *
+ * That has to be said out loud rather than left for someone to notice: with a
+ * breed selected, the KPI row reports ten animals while these cards still count
+ * sixty, and a card that quietly answers a different question than the one the
+ * filter asked is worse than a card that admits it.
+ */
+function useWholeHerdNote(): string {
+  const { filters } = useDashboardFilters()
+  return filters.breed ? ' · all breeds, not just the filtered one' : ''
+}
+
 export function BreedDistributionChart() {
   return (
     <DistributionChart
       title="Breed composition"
-      hint="Active hogs by breed, largest first"
+      hint={`Active hogs by breed, largest first${useWholeHerdNote()}`}
       query={useBreedDistribution()}
       order="count"
       emptyMessage="No hogs on record yet."
@@ -55,7 +71,7 @@ export function ProductionClassDistributionChart() {
   return (
     <DistributionChart
       title="Herd composition"
-      hint="Active hogs by production class, youngest first"
+      hint={`Active hogs by production class, youngest first${useWholeHerdNote()}`}
       query={useProductionClassDistribution()}
       order={PRODUCTION_CLASS_ORDER}
       emptyMessage="No hogs on record yet."

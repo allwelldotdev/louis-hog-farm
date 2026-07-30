@@ -13,6 +13,7 @@ import {
   TooltipShell,
 } from '@/components/dashboard/charts/chart-primitives'
 import { useFeedCostSeries } from '@/hooks/use-dashboard'
+import { useDashboardFilters } from '@/hooks/use-dashboard-filters'
 import { formatBusinessDate, formatMoney, formatMoneyCompact, formatNumber } from '@/lib/format'
 
 /**
@@ -30,8 +31,14 @@ import { formatBusinessDate, formatMoney, formatMoneyCompact, formatNumber } fro
  */
 export function FeedCostChart() {
   const query = useFeedCostSeries()
+  const { filters } = useDashboardFilters()
   const points = query.data?.points ?? []
   const currency = query.data?.currency_code ?? 'NGN'
+
+  // Feed is booked against the farm, not the breed, so this route takes no
+  // breed filter. Said plainly rather than left to be inferred from a total
+  // that does not move when the filter does.
+  const scope = filters.breed ? ' · whole herd, not just the filtered breed' : ''
 
   const data = points.map((point) => ({
     bucket: point.bucket,
@@ -43,7 +50,9 @@ export function FeedCostChart() {
   return (
     <ChartCard
       title="Feed cost"
-      hint={query.data ? `Spend and cost per kg of gain, by ${query.data.interval}` : undefined}
+      hint={
+        query.data ? `Spend and cost per kg of gain, by ${query.data.interval}${scope}` : undefined
+      }
       query={query}
       isEmpty={data.length === 0}
       emptyMessage="No feed recorded in this window."

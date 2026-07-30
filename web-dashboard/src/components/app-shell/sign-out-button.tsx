@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { clearPersistedCache } from '@/lib/query/persist'
 
 export function SignOutButton() {
   const router = useRouter()
@@ -19,7 +20,13 @@ export function SignOutButton() {
     // Clear before navigating, not after. Whatever is left in the cache would
     // otherwise paint the previous farm's numbers for the next person to sign
     // in on this browser.
+    //
+    // Both halves are required: `clear()` empties the in-memory cache, and the
+    // purge removes the copy on disk. Dropping only the first leaves the
+    // previous farm's figures in localStorage, where the next session restores
+    // them on mount — signed out, before any request is authorised.
     queryClient.clear()
+    clearPersistedCache()
 
     router.replace('/')
     router.refresh()

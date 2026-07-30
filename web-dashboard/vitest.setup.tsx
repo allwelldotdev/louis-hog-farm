@@ -1,5 +1,17 @@
 import { cleanup } from '@testing-library/react'
-import { afterEach, beforeAll } from 'vitest'
+import { afterEach, beforeAll, vi } from 'vitest'
+
+/**
+ * Every dashboard hook reads its filters from the URL, and `useSearchParams`
+ * throws outside a mounted App Router. Standing in an empty query string is
+ * what a component sees on an unfiltered dashboard, which is the state under
+ * test; a test that needs specific filters can override this per file.
+ */
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/dashboard',
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
+}))
 
 /**
  * jsdom has no layout engine and no `ResizeObserver`, and Recharts'
