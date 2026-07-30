@@ -13,9 +13,11 @@ from decimal import Decimal
 from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.alert import Alert, AlertStatus
 from app.models.feed_record import FeedRecord
 from app.models.health_record import HealthRecord
 from app.models.hog import Hog, HogStatus, ProductionClass
+from app.models.mortality_event import MortalityEvent
 
 
 @dataclass(frozen=True)
@@ -187,30 +189,90 @@ def count_feed_records_in_range(
     return _count_in_range(db, FeedRecord, farm_id, date_from, date_to, breed)
 
 
-def total_feed_cost_in_range(
+@dataclass(frozen=True)
+class FeedTotals:
+    feed_kg: Decimal
+    feed_cost: Decimal
+
+
+def feed_totals_in_range(
     db: Session,
     farm_id: int,
     date_from: date,
     date_to: date,
     breed: str | None,
-) -> tuple[Decimal, dict[str, Decimal]]:
-    stmt = (
-        select(func.coalesce(func.sum(FeedRecord.feed_cost), 0), FeedRecord.currency_code)
+) -> FeedTotals:
+    """Feed consumed and spent over the window.
+
+    No longer grouped by currency. A farm holds exactly one currency now that
+    writes take it from `farm.currency_code`, so the group-by only ever returned
+    one row — and the "mixed currency, report nothing" branch it fed was what
+    blanked every cost KPI (audit i).
+    """
+    stmt = select(
+        func.coalesce(func.sum(FeedRecord.feed_amount), 0),
+        func.coalesce(func.sum(FeedRecord.feed_cost), 0),
+    ).where(
+        FeedRecord.farm_id == farm_id,
+        FeedRecord.record_date >= date_from,
+        FeedRecord.record_date <= date_to,
+    )
+    if breed:
+        stmt = stmt.join(Hog, FeedRecord.hog_id == Hog.id).where(Hog.breed == breed)
+    kg, cost = db.execute(stmt).one()
+    return FeedTotals(feed_kg=Decimal(str(kg)), feed_cost=Decimal(str(cost)))
+
+
+def feed_kg_by_hog_in_range(
+    db: Session,
+    farm_id: int,
+    date_from: date,
+    date_to: date,
+) -> dict[int, float]:
+    """Feed consumed per hog — the denominator of a per-animal FCR."""
+    rows = db.execute(
+        select(FeedRecord.hog_id, func.coalesce(func.sum(FeedRecord.feed_amount), 0))
         .where(
             FeedRecord.farm_id == farm_id,
             FeedRecord.record_date >= date_from,
             FeedRecord.record_date <= date_to,
         )
-        .group_by(FeedRecord.currency_code)
+        .group_by(FeedRecord.hog_id)
+    ).all()
+    return {int(hog_id): float(kg) for hog_id, kg in rows}
+
+
+def count_mortalities_in_range(
+    db: Session,
+    farm_id: int,
+    date_from: date,
+    date_to: date,
+    breed: str | None,
+) -> int:
+    stmt = select(func.count(MortalityEvent.id)).where(
+        MortalityEvent.farm_id == farm_id,
+        MortalityEvent.event_date >= date_from,
+        MortalityEvent.event_date <= date_to,
     )
     if breed:
-        stmt = stmt.join(Hog, FeedRecord.hog_id == Hog.id).where(Hog.breed == breed)
-    totals: dict[str, Decimal] = {}
-    grand = Decimal("0")
-    for total, code in db.execute(stmt).all():
-        totals[code] = Decimal(str(total))
-        grand += Decimal(str(total))
-    return grand, totals
+        stmt = stmt.join(Hog, MortalityEvent.hog_id == Hog.id).where(Hog.breed == breed)
+    return int(db.scalar(stmt) or 0)
+
+
+def count_open_alerts(db: Session, farm_id: int) -> int:
+    """Deliberately not windowed by the dashboard's date range.
+
+    An alert raised two months ago and never actioned is still open today.
+    Filtering it out by date would hide exactly the ones that matter most.
+    """
+    return int(
+        db.scalar(
+            select(func.count(Alert.id)).where(
+                Alert.farm_id == farm_id, Alert.status == AlertStatus.open
+            )
+        )
+        or 0
+    )
 
 
 def total_weight_gain_kg(adg_rows: list[HogAdgRow]) -> float:

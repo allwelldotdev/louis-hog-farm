@@ -279,6 +279,140 @@ class TestMetaAndFarm:
         assert body["hog_count"] == 1
 
 
+def _hog_with_growth(
+    client: TestClient, auth: dict[str, Any], tag: str, first_kg: str, last_kg: str, feed_kg: str
+) -> dict[str, Any]:
+    """A hog with two weigh-ins 30 days apart and one feed record."""
+    hog = _make_hog(client, auth, tag_number=tag)
+    for day, kg in (("2026-06-01", first_kg), ("2026-07-01", last_kg)):
+        client.post(
+            f"{API}/health-records",
+            json={"hog_id": hog["id"], "weight": kg, "record_date": day},
+            headers=auth["headers"],
+        )
+    client.post(
+        f"{API}/feed-records",
+        json={
+            "hog_id": hog["id"],
+            "feed_amount": feed_kg,
+            "feed_cost": "1000",
+            "record_date": "2026-06-15",
+        },
+        headers=auth["headers"],
+    )
+    return hog
+
+
+class TestDashboardKpis:
+    def test_cost_kpis_are_reported_not_nulled(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """Regression for audit i.
+
+        The old response carried `feed_cost_by_currency` and blanked every cost
+        figure whenever more than one currency appeared. Currency now comes from
+        the farm, so there is one currency and one set of numbers.
+        """
+        _hog_with_growth(client, registered, "KPI-1", "50.0", "80.0", "60.0")
+        body = client.get(
+            f"{API}/dashboard/kpis?date_from=2026-06-01&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert "feed_cost_by_currency" not in body
+        assert body["currency_code"] == "NGN"
+        assert body["total_feed_cost"] == 1000.0
+        assert body["total_feed_kg"] == 60.0
+        assert body["feed_cost_per_kg_gain"] is not None
+
+    def test_fcr_is_feed_kg_over_gain_kg(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "KPI-2", "50.0", "80.0", "60.0")
+        body = client.get(
+            f"{API}/dashboard/kpis?date_from=2026-06-01&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert body["total_weight_gain_kg"] == 30.0
+        assert body["fcr"] == 2.0
+
+    def test_fcr_is_null_rather_than_zero_when_nothing_grew(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        body = client.get(f"{API}/dashboard/kpis", headers=registered["headers"]).json()
+        assert body["fcr"] is None
+        assert body["avg_daily_gain_kg"] is None
+        assert body["mortality_rate_pct"] is None
+
+    def test_mortality_and_alert_counts_are_present(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "KPI-3", "50.0", "80.0", "60.0")
+        body = client.get(f"{API}/dashboard/kpis", headers=registered["headers"]).json()
+        assert body["mortality_count"] == 0
+        assert body["mortality_rate_pct"] == 0.0
+        assert body["open_alerts_count"] == 0
+
+    def test_underperformers_no_longer_inline(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        body = client.get(f"{API}/dashboard/kpis", headers=registered["headers"]).json()
+        assert "underperformers" not in body
+
+
+class TestLeaderboard:
+    def test_top_by_adg_ranks_the_faster_grower_first(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "LB-slow", "50.0", "60.0", "40.0")
+        _hog_with_growth(client, registered, "LB-fast", "50.0", "90.0", "40.0")
+        body = client.get(
+            f"{API}/dashboard/leaderboard?metric=adg&direction=top"
+            "&date_from=2026-06-01&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert [r["tag_number"] for r in body["rows"]] == ["LB-fast", "LB-slow"]
+
+    def test_bottom_reverses_the_order(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "LB-slow", "50.0", "60.0", "40.0")
+        _hog_with_growth(client, registered, "LB-fast", "50.0", "90.0", "40.0")
+        body = client.get(
+            f"{API}/dashboard/leaderboard?metric=adg&direction=bottom"
+            "&date_from=2026-06-01&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert body["rows"][0]["tag_number"] == "LB-slow"
+        assert body["rows"][0]["is_underperformer"] is True
+
+    def test_fcr_ranking_excludes_hogs_without_a_ratio(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """A hog that was never fed has no ratio, not an unbeatable one."""
+        _hog_with_growth(client, registered, "LB-fed", "50.0", "80.0", "60.0")
+        unfed = _make_hog(client, registered, tag_number="LB-unfed")
+        for day, kg in (("2026-06-01", "50.0"), ("2026-07-01", "80.0")):
+            client.post(
+                f"{API}/health-records",
+                json={"hog_id": unfed["id"], "weight": kg, "record_date": day},
+                headers=registered["headers"],
+            )
+        body = client.get(
+            f"{API}/dashboard/leaderboard?metric=fcr&date_from=2026-06-01&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert [r["tag_number"] for r in body["rows"]] == ["LB-fed"]
+
+    def test_limit_caps_the_rows(self, client: TestClient, registered: dict[str, Any]) -> None:
+        for i in range(3):
+            _hog_with_growth(client, registered, f"LB-{i}", "50.0", f"{60 + i}.0", "40.0")
+        body = client.get(
+            f"{API}/dashboard/leaderboard?limit=2&date_from=2026-06-01&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert len(body["rows"]) == 2
+
+
 class TestDashboardCaching:
     def test_repeat_request_with_matching_etag_is_304(
         self, client: TestClient, registered: dict[str, Any]
