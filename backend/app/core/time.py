@@ -10,10 +10,35 @@ share a rule:
   and no offset; promoting it to a timestamp invents precision that was never
   recorded and creates off-by-one-day errors at range boundaries.
 * **"Today"** is resolved in the farm's local timezone, not UTC — see
-  ``utc_today`` below.
+  ``farm_today`` below.
 """
 
 from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+
+def farm_today(timezone: str) -> date:
+    """Today's date in a farm's local timezone.
+
+    Takes the IANA string rather than the ``Farm`` model so that ``app.core``
+    keeps no dependency on ``app.models``; every caller already has the farm in
+    hand and passes ``farm.timezone``.
+
+    This is the fix for a real rejection: for a farm at UTC+1, between 23:00 and
+    midnight local the "record_date cannot be in the future" check compared a
+    correct same-day entry against a UTC date that had not turned over yet, and
+    refused it.
+
+    An unrecognised zone falls back to UTC rather than raising. The column is
+    ``NOT NULL DEFAULT 'UTC'`` and only a manual edit can put a bad value there;
+    turning that into a 500 on every record write is a worse failure than
+    resolving "today" an hour early.
+    """
+    try:
+        zone = ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        zone = ZoneInfo("UTC")
+    return datetime.now(zone).date()
 
 
 def utc_now() -> datetime:
@@ -36,15 +61,3 @@ def as_utc(value: datetime | None) -> datetime | None:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
-
-
-def utc_today() -> date:
-    """Today's date in UTC.
-
-    Deliberately a single choke point: "today" should be evaluated in the farm's
-    local timezone, and a farm east or west of UTC will otherwise reject or
-    mis-window same-day entries near midnight. The farm-local replacement
-    arrives with the ``farms.timezone`` column; until then every caller shares
-    this one definition rather than four copies.
-    """
-    return datetime.now(UTC).date()

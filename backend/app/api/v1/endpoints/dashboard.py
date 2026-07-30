@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser
-from app.core.time import utc_today
+from app.core.time import farm_today
 from app.db.session import get_db
 from app.schemas.dashboard import (
     CurrencyTotal,
@@ -29,8 +29,9 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 def _default_range(
     date_from: date | None,
     date_to: date | None,
+    timezone: str,
 ) -> tuple[date, date]:
-    today = utc_today()
+    today = farm_today(timezone)
     end = date_to or today
     start = date_from or (end - timedelta(days=90))
     if start > end:
@@ -52,7 +53,7 @@ def get_dashboard_kpis(
         default=115.0, ge=0, description="Target live weight (kg) for market-ready %"
     ),
 ) -> DashboardKpisResponse:
-    start, end = _default_range(date_from, date_to)
+    start, end = _default_range(date_from, date_to, user.farm.timezone)
     endpoints = fetch_weight_endpoints_in_range(db, user.farm_id, start, end, breed)
     health_records_count = count_health_records_in_range(db, user.farm_id, start, end, breed)
     feed_records_count = count_feed_records_in_range(db, user.farm_id, start, end, breed)

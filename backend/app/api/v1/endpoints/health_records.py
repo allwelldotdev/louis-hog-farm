@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser
 from app.api.pagination import PageParams, paginate
-from app.core.time import utc_now, utc_today
+from app.core.time import farm_today, utc_now
 from app.db.session import get_db
 from app.models.health_record import HealthRecord
 from app.schemas.health import HealthRecordCreate, HealthRecordRead, HealthRecordUpdate
@@ -17,8 +17,8 @@ from app.schemas.pagination import Page
 router = APIRouter(prefix="/health-records", tags=["health-records"])
 
 
-def _assert_record_date_not_future(d: date) -> None:
-    if d > utc_today():
+def _assert_record_date_not_future(d: date, timezone: str) -> None:
+    if d > farm_today(timezone):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future"
         )
@@ -52,7 +52,7 @@ def create_health_record(
     body: HealthRecordCreate,
 ) -> HealthRecord:
     get_hog_in_farm(db, body.hog_id, user.farm_id)
-    _assert_record_date_not_future(body.record_date)
+    _assert_record_date_not_future(body.record_date, user.farm.timezone)
     rec = HealthRecord(
         hog_id=body.hog_id,
         farm_id=user.farm_id,
@@ -94,7 +94,7 @@ def update_health_record(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Health record not found")
     get_hog_in_farm(db, rec.hog_id, user.farm_id)
     if body.record_date is not None:
-        _assert_record_date_not_future(body.record_date)
+        _assert_record_date_not_future(body.record_date, user.farm.timezone)
         rec.record_date = body.record_date
     if body.weight is not None:
         rec.weight = body.weight

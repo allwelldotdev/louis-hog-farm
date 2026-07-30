@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser, is_manager_like
 from app.api.pagination import PageParams, paginate
-from app.core.time import utc_now, utc_today
+from app.core.time import farm_today, utc_now
 from app.db.session import get_db
 from app.models.feed_record import FeedRecord
 from app.models.user import User
@@ -20,8 +20,8 @@ router = APIRouter(prefix="/feed-records", tags=["feed-records"])
 FEED_EDIT_GRACE = timedelta(hours=24)
 
 
-def _assert_record_date_not_future(d: date) -> None:
-    if d > utc_today():
+def _assert_record_date_not_future(d: date, timezone: str) -> None:
+    if d > farm_today(timezone):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future"
         )
@@ -71,7 +71,7 @@ def create_feed_record(
     body: FeedRecordCreate,
 ) -> FeedRecord:
     get_hog_in_farm(db, body.hog_id, user.farm_id)
-    _assert_record_date_not_future(body.record_date)
+    _assert_record_date_not_future(body.record_date, user.farm.timezone)
     rec = FeedRecord(
         hog_id=body.hog_id,
         farm_id=user.farm_id,
@@ -117,7 +117,7 @@ def update_feed_record(
     get_hog_in_farm(db, rec.hog_id, user.farm_id)
     _assert_can_edit_feed(user, rec)
     if body.record_date is not None:
-        _assert_record_date_not_future(body.record_date)
+        _assert_record_date_not_future(body.record_date, user.farm.timezone)
         rec.record_date = body.record_date
     if body.feed_amount is not None:
         rec.feed_amount = body.feed_amount

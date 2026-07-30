@@ -4,10 +4,16 @@ import random
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
-from app.core.time import as_utc, utc_now
+from app.core.time import as_utc, farm_today, utc_now
 from app.models.hog import ProductionClass
 from app.seed import generators as gen
 from app.services.dashboard_metrics import HogWeightEndpoints, compute_adg_rows
+
+# The widest real offsets in the IANA database: +14:00 and -11:00. Between them
+# the calendar date always differs by at most one day, which is what the
+# assertions below pin down without depending on when the suite runs.
+EAST_OF_UTC = "Pacific/Kiritimati"
+WEST_OF_UTC = "Pacific/Niue"
 
 
 def _endpoints(first_kg: str, last_kg: str, span_days: int, hog_id: int = 1) -> HogWeightEndpoints:
@@ -67,6 +73,37 @@ class TestTimeHelpers:
     def test_aware_value_is_normalised_not_shifted(self) -> None:
         aware = datetime(2026, 7, 30, 12, 0, 0, tzinfo=UTC)
         assert as_utc(aware) == aware
+
+
+class TestFarmToday:
+    def test_zoneinfo_database_is_available(self) -> None:
+        """Guards the `tzdata` dependency.
+
+        python:3.12-slim ships no /usr/share/zoneinfo, so without the tzdata
+        wheel this resolves on a developer machine and raises inside the
+        container — a failure that only appears after deployment.
+        """
+        assert farm_today("Africa/Lagos") is not None
+
+    def test_east_of_utc_is_never_behind_utc(self) -> None:
+        """The rejection this replaced.
+
+        A farm at a positive offset turns over to the next calendar day before
+        UTC does. Comparing a same-day entry against the UTC date rejected it as
+        "in the future" for those hours.
+        """
+        assert farm_today(EAST_OF_UTC) >= farm_today("UTC")
+
+    def test_west_of_utc_is_never_ahead_of_utc(self) -> None:
+        assert farm_today(WEST_OF_UTC) <= farm_today("UTC")
+
+    def test_extreme_offsets_differ_by_at_most_one_day(self) -> None:
+        assert (farm_today(EAST_OF_UTC) - farm_today(WEST_OF_UTC)).days <= 1
+
+    def test_unknown_zone_falls_back_to_utc_rather_than_raising(self) -> None:
+        # A bad IANA string is a data problem; making it a 500 on every record
+        # write would be a worse failure than resolving "today" in UTC.
+        assert farm_today("Mars/Olympus_Mons") == farm_today("UTC")
 
 
 class TestGrowthGenerator:
