@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,12 +16,14 @@ router = APIRouter(prefix="/health-records", tags=["health-records"])
 
 
 def _utc_today() -> date:
-    return datetime.now(timezone.utc).date()
+    return datetime.now(UTC).date()
 
 
 def _assert_record_date_not_future(d: date) -> None:
     if d > _utc_today():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future"
+        )
 
 
 @router.get("", response_model=list[HealthRecordRead])
@@ -32,7 +34,11 @@ def list_health_records(
     date_from: date | None = None,
     date_to: date | None = None,
 ) -> list[HealthRecord]:
-    stmt = select(HealthRecord).join(Hog, HealthRecord.hog_id == Hog.id).where(Hog.farm_id == user.farm_id)
+    stmt = (
+        select(HealthRecord)
+        .join(Hog, HealthRecord.hog_id == Hog.id)
+        .where(Hog.farm_id == user.farm_id)
+    )
     if hog_id is not None:
         get_hog_in_farm(db, hog_id, user.farm_id)
         stmt = stmt.where(HealthRecord.hog_id == hog_id)
@@ -101,7 +107,7 @@ def update_health_record(
     if body.notes is not None:
         rec.notes = body.notes
     rec.updated_by_user_id = user.id
-    rec.updated_at = datetime.now(timezone.utc)
+    rec.updated_at = datetime.now(UTC)
     db.add(rec)
     db.commit()
     db.refresh(rec)

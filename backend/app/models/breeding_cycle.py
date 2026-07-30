@@ -2,14 +2,13 @@ import enum
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.hog import Hog
-    from app.models.user import User
 
 
 class BreedingStatus(str, enum.Enum):
@@ -26,7 +25,9 @@ class BreedingCycle(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[BreedingStatus] = mapped_column(
-        Enum(BreedingStatus, native_enum=False, length=32), nullable=False, default=BreedingStatus.ongoing
+        Enum(BreedingStatus, native_enum=False, length=32),
+        nullable=False,
+        default=BreedingStatus.ongoing,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

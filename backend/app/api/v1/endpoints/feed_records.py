@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,12 +19,14 @@ FEED_EDIT_GRACE = timedelta(hours=24)
 
 
 def _utc_today() -> date:
-    return datetime.now(timezone.utc).date()
+    return datetime.now(UTC).date()
 
 
 def _assert_record_date_not_future(d: date) -> None:
     if d > _utc_today():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="record_date cannot be in the future"
+        )
 
 
 def _assert_can_edit_feed(user: User, rec: FeedRecord) -> None:
@@ -32,8 +34,8 @@ def _assert_can_edit_feed(user: User, rec: FeedRecord) -> None:
     if created is None:
         return
     if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) - created <= FEED_EDIT_GRACE:
+        created = created.replace(tzinfo=UTC)
+    if datetime.now(UTC) - created <= FEED_EDIT_GRACE:
         return
     if is_manager_like(user):
         return
@@ -51,7 +53,9 @@ def list_feed_records(
     date_from: date | None = None,
     date_to: date | None = None,
 ) -> list[FeedRecord]:
-    stmt = select(FeedRecord).join(Hog, FeedRecord.hog_id == Hog.id).where(Hog.farm_id == user.farm_id)
+    stmt = (
+        select(FeedRecord).join(Hog, FeedRecord.hog_id == Hog.id).where(Hog.farm_id == user.farm_id)
+    )
     if hog_id is not None:
         get_hog_in_farm(db, hog_id, user.farm_id)
         stmt = stmt.where(FeedRecord.hog_id == hog_id)
@@ -121,7 +125,7 @@ def update_feed_record(
     if body.currency_code is not None:
         rec.currency_code = body.currency_code.upper()
     rec.updated_by_user_id = user.id
-    rec.updated_at = datetime.now(timezone.utc)
+    rec.updated_at = datetime.now(UTC)
     db.add(rec)
     db.commit()
     db.refresh(rec)

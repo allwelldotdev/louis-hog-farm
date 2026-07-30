@@ -2,21 +2,24 @@ import logging
 import os
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 
+from alembic import command
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 def _use_sqlite_fallback() -> bool:
-    return settings.database_url.startswith("sqlite") or os.getenv("USE_SQLITE_FOR_LOCAL", "0") == "1"
+    return (
+        settings.database_url.startswith("sqlite") or os.getenv("USE_SQLITE_FOR_LOCAL", "0") == "1"
+    )
 
 
-def _create_sqlite_schema(engine) -> None:
+def _create_sqlite_schema(engine: Engine) -> None:
     with engine.begin() as conn:
         conn.execute(text("PRAGMA foreign_keys = ON"))
         conn.exec_driver_sql(
@@ -169,8 +172,12 @@ def _create_sqlite_schema(engine) -> None:
         )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_users_farm_id ON users (farm_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_hogs_farm_id ON hogs (farm_id)")
-        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_feed_records_hog_id ON feed_records (hog_id)")
-        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_health_records_hog_id ON health_records (hog_id)")
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_feed_records_hog_id ON feed_records (hog_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_health_records_hog_id ON health_records (hog_id)"
+        )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_alerts_hog_id ON alerts (hog_id)")
 
 
@@ -202,7 +209,9 @@ def run_migrations() -> None:
         command.upgrade(cfg, "head")
         return
     except OperationalError as exc:
-        logger.warning("Database unavailable for migrations, trying fallback startup initialization: %s", exc)
+        logger.warning(
+            "Database unavailable for migrations, trying fallback startup initialization: %s", exc
+        )
     except Exception as exc:  # pragma: no cover - defensive fallback for local development
         logger.warning("Migrations failed, trying fallback startup initialization: %s", exc)
 

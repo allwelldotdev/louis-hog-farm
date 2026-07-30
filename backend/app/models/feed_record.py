@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, func
@@ -8,7 +9,6 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.hog import Hog
-    from app.models.user import User
 
 
 class FeedRecord(Base):
@@ -16,8 +16,8 @@ class FeedRecord(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     hog_id: Mapped[int] = mapped_column(ForeignKey("hogs.id"), nullable=False, index=True)
-    feed_amount: Mapped[float] = mapped_column(Numeric(12, 4), nullable=False)
-    feed_cost: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    feed_amount: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    feed_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     currency_code: Mapped[str] = mapped_column(String(3), nullable=False, default="GBP")
     record_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

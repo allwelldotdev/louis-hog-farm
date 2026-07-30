@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.models.feed_record import FeedRecord
@@ -33,7 +33,9 @@ class HogAdgRow:
     days: int
 
 
-def _hog_query(farm_id: int, breed: str | None, statuses: Iterable[HogStatus] | None = None):
+def _hog_query(
+    farm_id: int, breed: str | None, statuses: Iterable[HogStatus] | None = None
+) -> Select[tuple[Hog]]:
     stmt = select(Hog).where(Hog.farm_id == farm_id)
     if breed:
         stmt = stmt.where(Hog.breed == breed)
@@ -50,7 +52,13 @@ def fetch_health_points_in_range(
     breed: str | None,
 ) -> list[HogWeightSeriesPoint]:
     stmt = (
-        select(HealthRecord.hog_id, Hog.tag_number, Hog.breed, HealthRecord.record_date, HealthRecord.weight)
+        select(
+            HealthRecord.hog_id,
+            Hog.tag_number,
+            Hog.breed,
+            HealthRecord.record_date,
+            HealthRecord.weight,
+        )
         .join(Hog, HealthRecord.hog_id == Hog.id)
         .where(
             Hog.farm_id == farm_id,
@@ -200,7 +208,9 @@ def market_ready_stats(
     for hog_id, _d, w in rows:
         if hog_id not in latest:
             latest[hog_id] = Decimal(str(w))
-    ready = sum(1 for hid in hog_ids if latest.get(hid, Decimal("0")) >= Decimal(str(market_weight_kg)))
+    ready = sum(
+        1 for hid in hog_ids if latest.get(hid, Decimal("0")) >= Decimal(str(market_weight_kg))
+    )
     return ready, len(hog_ids)
 
 

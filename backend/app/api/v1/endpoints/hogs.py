@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -17,7 +17,9 @@ from app.services.dashboard_metrics import fetch_growth_series_for_hog
 router = APIRouter(prefix="/hogs", tags=["hogs"])
 
 
-def _active_tag_taken(db: Session, farm_id: int, tag: str, exclude_hog_id: int | None = None) -> bool:
+def _active_tag_taken(
+    db: Session, farm_id: int, tag: str, exclude_hog_id: int | None = None
+) -> bool:
     stmt = select(Hog.id).where(
         Hog.farm_id == farm_id,
         Hog.tag_number == tag,
@@ -103,13 +105,19 @@ def update_hog(
 ) -> Hog:
     hog = get_hog_in_farm(db, hog_id, user.farm_id)
     if body.status == HogStatus.archived and user.role == UserRole.worker:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only a manager can archive a hog")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Only a manager can archive a hog"
+        )
     if body.status == HogStatus.active and hog.status == HogStatus.archived:
         if not is_manager_like(user):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only a manager can restore a hog")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Only a manager can restore a hog"
+            )
     new_tag = body.tag_number if body.tag_number is not None else hog.tag_number
     new_status = body.status if body.status is not None else hog.status
-    if new_status == HogStatus.active and _active_tag_taken(db, user.farm_id, new_tag, exclude_hog_id=hog.id):
+    if new_status == HogStatus.active and _active_tag_taken(
+        db, user.farm_id, new_tag, exclude_hog_id=hog.id
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An active hog with this tag number already exists on the farm",
@@ -123,7 +131,7 @@ def update_hog(
     if body.status is not None:
         hog.status = body.status
     hog.updated_by_user_id = user.id
-    hog.updated_at = datetime.now(timezone.utc)
+    hog.updated_at = datetime.now(UTC)
     db.add(hog)
     db.commit()
     db.refresh(hog)

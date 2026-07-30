@@ -10,7 +10,6 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.farm import Farm
     from app.models.hog import Hog
-    from app.models.user import User
 
 
 class AlertType(str, enum.Enum):

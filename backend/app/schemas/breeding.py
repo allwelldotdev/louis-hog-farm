@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 
 from app.models.breeding_cycle import BreedingStatus
 
@@ -19,7 +19,11 @@ class BreedingCycleUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_dates(self) -> "BreedingCycleUpdate":
-        if self.end_date is not None and self.start_date is not None and self.end_date < self.start_date:
+        if (
+            self.end_date is not None
+            and self.start_date is not None
+            and self.end_date < self.start_date
+        ):
             raise ValueError("end_date must be on or after start_date")
         return self
 

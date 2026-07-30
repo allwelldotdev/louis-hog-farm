@@ -1,9 +1,9 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from jose import JWTError, jwt
 
 from app.core.config import settings
 
@@ -23,13 +23,13 @@ def verify_password(plain: str, password_hash: str) -> bool:
 
 
 def create_refresh_token(subject: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_expire_days)
+    expire = datetime.now(UTC) + timedelta(days=settings.jwt_refresh_expire_days)
     payload: dict[str, Any] = {"sub": subject, "exp": expire, "typ": "refresh"}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_expire_minutes)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.jwt_access_expire_minutes)
     payload: dict[str, Any] = {"sub": subject, "exp": expire, "typ": "access"}
     if extra_claims:
         payload.update(extra_claims)
@@ -39,5 +39,5 @@ def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None
 def decode_token(token: str) -> dict[str, Any] | None:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-    except JWTError:
+    except jwt.PyJWTError:
         return None

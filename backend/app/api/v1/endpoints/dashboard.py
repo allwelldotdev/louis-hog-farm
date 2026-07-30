@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -28,7 +28,7 @@ def _default_range(
     date_from: date | None,
     date_to: date | None,
 ) -> tuple[date, date]:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     end = date_to or today
     start = date_from or (end - timedelta(days=90))
     if start > end:
@@ -46,7 +46,9 @@ def get_dashboard_kpis(
     date_from: date | None = None,
     date_to: date | None = None,
     breed: str | None = Query(default=None, description="Exact breed filter (optional)"),
-    market_weight_kg: float = Query(default=115.0, ge=0, description="Target live weight (kg) for market-ready %"),
+    market_weight_kg: float = Query(
+        default=115.0, ge=0, description="Target live weight (kg) for market-ready %"
+    ),
 ) -> DashboardKpisResponse:
     start, end = _default_range(date_from, date_to)
     points = fetch_health_points_in_range(db, user.farm_id, start, end, breed)
@@ -106,7 +108,10 @@ def get_dashboard_kpis(
         health_records_count=health_records_count,
         feed_records_count=feed_records_count,
         total_feed_cost=total_cost,
-        feed_cost_by_currency=[CurrencyTotal(currency_code=k, total_feed_cost=float(v)) for k, v in sorted(feed_by_ccy.items())],
+        feed_cost_by_currency=[
+            CurrencyTotal(currency_code=k, total_feed_cost=float(v))
+            for k, v in sorted(feed_by_ccy.items())
+        ],
         feed_cost_per_kg_gain=per_kg,
         market_ready_count=ready,
         active_hogs_count=active,

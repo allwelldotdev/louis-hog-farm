@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -51,7 +52,9 @@ def seed_demo_data() -> dict[str, int]:
 
         created_hogs = []
         for spec in hog_specs:
-            hog = db.scalar(select(Hog).where(Hog.farm_id == farm.id, Hog.tag_number == spec["tag_number"]))
+            hog = db.scalar(
+                select(Hog).where(Hog.farm_id == farm.id, Hog.tag_number == spec["tag_number"])
+            )
             if hog is None:
                 hog = Hog(
                     farm_id=farm.id,
@@ -65,8 +68,8 @@ def seed_demo_data() -> dict[str, int]:
                 db.add(hog)
                 db.flush()
             else:
-                hog.birth_date = spec["birth_date"]
-                hog.breed = spec["breed"]
+                hog.birth_date = cast(date, spec["birth_date"])
+                hog.breed = cast(str, spec["breed"])
                 hog.status = HogStatus.active
                 hog.updated_by_user_id = manager.id
                 db.add(hog)

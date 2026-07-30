@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,7 +9,7 @@ from app.db.migrate import run_migrations
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     run_migrations()
     yield
 
@@ -39,6 +40,7 @@ def health() -> dict[str, str]:
 if __name__ == "__main__":
     import os
     import sys
+
     import uvicorn
 
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

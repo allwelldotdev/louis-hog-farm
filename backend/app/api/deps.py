@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -27,12 +27,18 @@ def get_current_user(
     try:
         user_id = int(sub)
     except (TypeError, ValueError):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        ) from None
     user = db.get(User, user_id)
     if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive or not found")
-    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive or not found"
+        )
+    if user.locked_until and user.locked_until > datetime.now(UTC):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked"
+        )
     return user
 
 
@@ -45,13 +51,17 @@ def is_manager_like(user: User) -> bool:
 
 def require_not_viewer(user: CurrentUser) -> User:
     if user.role == UserRole.viewer:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
     return user
 
 
 def require_manager(user: CurrentUser) -> User:
     if not is_manager_like(user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager or admin required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Manager or admin required"
+        )
     return user
 
 

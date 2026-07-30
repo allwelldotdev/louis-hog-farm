@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -89,7 +89,7 @@ def update_alert(
     if body.resolution_notes is not None:
         alert.resolution_notes = body.resolution_notes
     alert.updated_by_user_id = user.id
-    alert.updated_at = datetime.now(timezone.utc)
+    alert.updated_at = datetime.now(UTC)
     db.add(alert)
     db.commit()
     db.refresh(alert)

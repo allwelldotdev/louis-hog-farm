@@ -1,0 +1,43 @@
+# Without this file the build context ships ~300 MB of node_modules, .venv and
+# tool caches to the daemon on every `docker build`.
+
+# VCS / agent tooling
+.git
+.gitignore
+.claude
+CLAUDE.md
+
+# Python
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
+
+# Node / web dashboard
+**/node_modules
+**/.next
+**/dist
+**/.vite
+
+# Local databases and secrets
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode
+.idea
+**/.DS_Store
+**/Thumbs.db
+
+# Docs and local orchestration (not needed inside the image)
+README.md
+docker-compose.yml
+Makefile
+**/*.log

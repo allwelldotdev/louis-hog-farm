@@ -6,15 +6,16 @@ Create Date: 2026-05-14
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "m1_002"
-down_revision: Union[str, None] = "m0_001"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "m0_001"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -27,7 +28,9 @@ def upgrade() -> None:
         postgresql_where=sa.text("status = 'active'"),
     )
     op.add_column("hogs", sa.Column("updated_by_user_id", sa.Integer(), nullable=True))
-    op.create_foreign_key("fk_hogs_updated_by_user_id", "hogs", "users", ["updated_by_user_id"], ["id"])
+    op.create_foreign_key(
+        "fk_hogs_updated_by_user_id", "hogs", "users", ["updated_by_user_id"], ["id"]
+    )
 
     op.create_table(
         "alert_rules",
@@ -37,7 +40,12 @@ def upgrade() -> None:
         sa.Column("rule_type", sa.String(length=64), nullable=False),
         sa.Column("config_json", sa.Text(), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["farm_id"], ["farms.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -53,8 +61,18 @@ def upgrade() -> None:
         sa.Column("record_date", sa.Date(), nullable=False),
         sa.Column("created_by_user_id", sa.Integer(), nullable=True),
         sa.Column("updated_by_user_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.CheckConstraint("feed_amount >= 0", name="ck_feed_records_amount_nonneg"),
         sa.CheckConstraint("feed_cost >= 0", name="ck_feed_records_cost_nonneg"),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"]),
@@ -63,7 +81,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_feed_records_hog_id"), "feed_records", ["hog_id"], unique=False)
-    op.create_index(op.f("ix_feed_records_record_date"), "feed_records", ["record_date"], unique=False)
+    op.create_index(
+        op.f("ix_feed_records_record_date"), "feed_records", ["record_date"], unique=False
+    )
 
     op.create_table(
         "health_records",
@@ -75,8 +95,18 @@ def upgrade() -> None:
         sa.Column("record_date", sa.Date(), nullable=False),
         sa.Column("created_by_user_id", sa.Integer(), nullable=True),
         sa.Column("updated_by_user_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.CheckConstraint("weight > 0", name="ck_health_records_weight_pos"),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["hog_id"], ["hogs.id"]),
@@ -84,7 +114,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_health_records_hog_id"), "health_records", ["hog_id"], unique=False)
-    op.create_index(op.f("ix_health_records_record_date"), "health_records", ["record_date"], unique=False)
+    op.create_index(
+        op.f("ix_health_records_record_date"), "health_records", ["record_date"], unique=False
+    )
 
     op.create_table(
         "breeding_cycles",
@@ -96,8 +128,18 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_by_user_id", sa.Integer(), nullable=True),
         sa.Column("updated_by_user_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["hog_id"], ["hogs.id"]),
         sa.ForeignKeyConstraint(["updated_by_user_id"], ["users.id"]),
@@ -117,8 +159,18 @@ def upgrade() -> None:
         sa.Column("resolution_notes", sa.Text(), nullable=True),
         sa.Column("created_by_user_id", sa.Integer(), nullable=True),
         sa.Column("updated_by_user_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["alert_rule_id"], ["alert_rules.id"]),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["hog_id"], ["hogs.id"]),

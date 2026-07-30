@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,22 +16,29 @@ router = APIRouter(prefix="/breeding-cycles", tags=["breeding-cycles"])
 
 
 def _utc_today() -> date:
-    return datetime.now(timezone.utc).date()
+    return datetime.now(UTC).date()
 
 
 def _assert_not_future(d: date) -> None:
     if d > _utc_today():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date cannot be in the future")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Date cannot be in the future"
+        )
 
 
-def _validate_cycle_dates(start: date, end: date | None, status: BreedingStatus) -> None:
-    if status in (BreedingStatus.completed, BreedingStatus.aborted) and end is None:
+def _validate_cycle_dates(start: date, end: date | None, new_status: BreedingStatus) -> None:
+    # Named new_status, not status: shadowing fastapi.status here made both raise
+    # paths below throw AttributeError instead of returning 400 (audit c).
+    if new_status in (BreedingStatus.completed, BreedingStatus.aborted) and end is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="end_date is required when status is completed or aborted",
         )
     if end is not None and end < start:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="end_date must be on or after start_date")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_date must be on or after start_date",
+        )
 
 
 @router.get("", response_model=list[BreedingCycleRead])
@@ -40,7 +47,11 @@ def list_breeding_cycles(
     user: CurrentUser,
     hog_id: int | None = None,
 ) -> list[BreedingCycle]:
-    stmt = select(BreedingCycle).join(Hog, BreedingCycle.hog_id == Hog.id).where(Hog.farm_id == user.farm_id)
+    stmt = (
+        select(BreedingCycle)
+        .join(Hog, BreedingCycle.hog_id == Hog.id)
+        .where(Hog.farm_id == user.farm_id)
+    )
     if hog_id is not None:
         get_hog_in_farm(db, hog_id, user.farm_id)
         stmt = stmt.where(BreedingCycle.hog_id == hog_id)
@@ -78,7 +89,9 @@ def get_breeding_cycle(
 ) -> BreedingCycle:
     cycle = db.get(BreedingCycle, cycle_id)
     if cycle is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Breeding cycle not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Breeding cycle not found"
+        )
     get_hog_in_farm(db, cycle.hog_id, user.farm_id)
     return cycle
 
@@ -92,7 +105,9 @@ def update_breeding_cycle(
 ) -> BreedingCycle:
     cycle = db.get(BreedingCycle, cycle_id)
     if cycle is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Breeding cycle not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Breeding cycle not found"
+        )
     get_hog_in_farm(db, cycle.hog_id, user.farm_id)
 
     if body.start_date is not None:
@@ -109,7 +124,7 @@ def update_breeding_cycle(
         if body.notes is not None:
             cycle.notes = body.notes
             cycle.updated_by_user_id = user.id
-            cycle.updated_at = datetime.now(timezone.utc)
+            cycle.updated_at = datetime.now(UTC)
             db.add(cycle)
             db.commit()
             db.refresh(cycle)
@@ -121,7 +136,9 @@ def update_breeding_cycle(
 
     if body.status is not None and body.status != cycle.status:
         if body.status not in (BreedingStatus.completed, BreedingStatus.aborted):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition"
+            )
 
     _validate_cycle_dates(start, end, new_status)
 
@@ -135,7 +152,7 @@ def update_breeding_cycle(
         cycle.notes = body.notes
 
     cycle.updated_by_user_id = user.id
-    cycle.updated_at = datetime.now(timezone.utc)
+    cycle.updated_at = datetime.now(UTC)
     db.add(cycle)
     db.commit()
     db.refresh(cycle)
