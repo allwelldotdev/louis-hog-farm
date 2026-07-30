@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.cache import DashboardCache
 from app.api.deps import CurrentUser
 from app.core.time import farm_today
 from app.db.session import get_db
@@ -46,6 +47,7 @@ def _default_range(
 def get_dashboard_kpis(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    cache: DashboardCache,
     date_from: date | None = None,
     date_to: date | None = None,
     breed: str | None = Query(default=None, description="Exact breed filter (optional)"),

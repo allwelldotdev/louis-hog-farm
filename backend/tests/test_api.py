@@ -258,6 +258,68 @@ class TestDataVersion:
         assert after - before == 1
 
 
+class TestMetaAndFarm:
+    def test_data_version_endpoint_tracks_the_counter(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        before = client.get(f"{API}/meta/data-version", headers=registered["headers"]).json()
+        _make_hog(client, registered, tag_number="META-1")
+        after = client.get(f"{API}/meta/data-version", headers=registered["headers"]).json()
+        assert after["farm_id"] == before["farm_id"]
+        assert after["version"] > before["version"]
+
+    def test_farms_me_reports_currency_timezone_and_herd_size(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _make_hog(client, registered, tag_number="FARM-1")
+        body = client.get(f"{API}/farms/me", headers=registered["headers"]).json()
+        assert body["name"] == "Test Farm"
+        assert body["currency_code"] == "NGN"
+        assert body["timezone"] == "UTC"
+        assert body["hog_count"] == 1
+
+
+class TestDashboardCaching:
+    def test_repeat_request_with_matching_etag_is_304(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        first = client.get(f"{API}/dashboard/kpis", headers=registered["headers"])
+        assert first.status_code == 200
+        etag = first.headers["etag"]
+        assert first.headers["cache-control"] == "private, no-cache"
+
+        second = client.get(
+            f"{API}/dashboard/kpis",
+            headers={**registered["headers"], "If-None-Match": etag},
+        )
+        assert second.status_code == 304
+        assert second.content == b""
+
+    def test_a_write_invalidates_the_etag(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """The whole point of validating against `data_versions`.
+
+        A 304 must not survive a write, or the dashboard shows numbers that the
+        database has already moved past.
+        """
+        etag = client.get(f"{API}/dashboard/kpis", headers=registered["headers"]).headers["etag"]
+        _make_hog(client, registered, tag_number="ETAG-1")
+        after = client.get(
+            f"{API}/dashboard/kpis",
+            headers={**registered["headers"], "If-None-Match": etag},
+        )
+        assert after.status_code == 200
+        assert after.headers["etag"] != etag
+
+    def test_different_parameters_get_different_etags(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        a = client.get(f"{API}/dashboard/kpis?breed=Duroc", headers=registered["headers"])
+        b = client.get(f"{API}/dashboard/kpis?breed=Landrace", headers=registered["headers"])
+        assert a.headers["etag"] != b.headers["etag"]
+
+
 class TestExports:
     def test_csv_has_a_header_and_one_row_per_record(
         self, client: TestClient, registered: dict[str, Any]

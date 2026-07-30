@@ -1,10 +1,11 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.api.cache import CACHE_CONTROL, NotModified
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db import readiness
@@ -44,6 +45,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(NotModified)
+async def not_modified_handler(request: Request, exc: Exception) -> Response:
+    """Turn the cache dependency's signal into a bodyless 304.
+
+    A dependency cannot return a response, and raising `HTTPException(304)`
+    would attach a JSON `detail` body — which a 304 is not allowed to carry.
+    """
+    headers = {"Cache-Control": CACHE_CONTROL}
+    if isinstance(exc, NotModified):
+        headers["ETag"] = exc.etag
+    return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+
 
 app.include_router(api_router, prefix="/api/v1")
 
