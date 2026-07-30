@@ -19,6 +19,24 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   )
 }
 
+/** A native `select`, styled to match `Input`. Native rather than a custom
+ *  listbox because the option lists here are short and the browser's own
+ *  control is already keyboard- and screen-reader-correct on every platform. */
+export function Select({ className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      className={cn(
+        'h-9 rounded-control border border-rule bg-raised px-2.5 text-sm text-ink',
+        'transition-colors hover:border-rule-strong',
+        'focus:border-ochre focus:outline-none',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
 /** Label, control and message as one unit, so a form never drifts out of
  *  alignment and the error always sits with the field it belongs to. */
 export function Field({

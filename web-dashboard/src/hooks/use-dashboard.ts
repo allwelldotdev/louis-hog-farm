@@ -9,6 +9,7 @@ import type {
   Distribution,
   FeedCostSeries,
   HerdGrowth,
+  Leaderboard,
   WeightDistribution,
 } from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
@@ -63,6 +64,22 @@ export function useFeedCostSeries() {
   return useQuery({
     queryKey: queryKeys.dashboard('feed-cost-series'),
     queryFn: () => apiGet<FeedCostSeries>('/dashboard/feed-cost-series'),
+  })
+}
+
+export type LeaderboardMetric = 'adg' | 'gain' | 'fcr'
+export type LeaderboardDirection = 'top' | 'bottom'
+
+export function useLeaderboard(params: {
+  metric: LeaderboardMetric
+  direction: LeaderboardDirection
+  limit: number
+}) {
+  return useQuery({
+    // The params are part of the key, so switching metric reads from cache on
+    // the way back rather than refetching a ranking already held.
+    queryKey: queryKeys.dashboard('leaderboard', params),
+    queryFn: () => apiGet<Leaderboard>('/dashboard/leaderboard', params),
   })
 }
 
