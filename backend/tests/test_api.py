@@ -413,6 +413,103 @@ class TestLeaderboard:
         assert len(body["rows"]) == 2
 
 
+class TestDashboardCharts:
+    RANGE = "date_from=2026-06-01&date_to=2026-07-31"
+
+    def test_herd_growth_reports_a_percentile_band(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "HG-1", "50.0", "80.0", "40.0")
+        _hog_with_growth(client, registered, "HG-2", "60.0", "95.0", "40.0")
+        body = client.get(
+            f"{API}/dashboard/herd-growth?interval=week&{self.RANGE}",
+            headers=registered["headers"],
+        ).json()
+        assert body["interval"] == "week"
+        assert len(body["points"]) == 2
+        first = body["points"][0]
+        assert first["hog_count"] == 2
+        assert first["p10_weight_kg"] <= first["median_weight_kg"] <= first["p90_weight_kg"]
+
+    def test_herd_growth_rejects_an_unknown_interval(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """The Literal closes the set before `date_trunc` ever sees the value."""
+        r = client.get(
+            f"{API}/dashboard/herd-growth?interval=fortnight", headers=registered["headers"]
+        )
+        assert r.status_code == 422
+
+    def test_breed_distribution_counts_and_averages_by_breed(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "BD-1", "50.0", "80.0", "40.0")
+        _make_hog(client, registered, tag_number="BD-2", breed="Landrace")
+        body = client.get(
+            f"{API}/dashboard/breed-distribution?{self.RANGE}", headers=registered["headers"]
+        ).json()
+        assert body["group_by"] == "breed"
+        assert body["total_hogs"] == 2
+        by_key = {r["key"]: r for r in body["rows"]}
+        assert by_key["Duroc"]["avg_adg_kg_per_day"] is not None
+        # Never weighed, so there is no average to report — not a zero.
+        assert by_key["Landrace"]["avg_weight_kg"] is None
+
+    def test_production_class_distribution_renders_the_herd(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _make_hog(client, registered, tag_number="PC-1")
+        body = client.get(
+            f"{API}/dashboard/production-class-distribution", headers=registered["headers"]
+        ).json()
+        assert body["group_by"] == "production_class"
+        assert body["rows"][0]["key"] == "piglet"
+
+    def test_weight_distribution_bins_the_latest_weights(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "WD-1", "50.0", "82.0", "40.0")
+        body = client.get(
+            f"{API}/dashboard/weight-distribution?bucket_kg=10&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert body["total_hogs"] == 1
+        assert body["buckets"][0]["lower_kg"] == 80.0
+        assert body["buckets"][0]["upper_kg"] == 90.0
+
+    def test_feed_cost_series_reports_spend_per_bucket(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _hog_with_growth(client, registered, "FC-1", "50.0", "80.0", "60.0")
+        body = client.get(
+            f"{API}/dashboard/feed-cost-series?interval=week&{self.RANGE}",
+            headers=registered["headers"],
+        ).json()
+        assert body["currency_code"] == "NGN"
+        assert sum(p["feed_cost"] for p in body["points"]) == 1000.0
+
+    def test_alert_summary_counts_by_status_and_type(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        hog = _make_hog(client, registered, tag_number="AL-1")
+        client.post(
+            f"{API}/alerts",
+            json={
+                "hog_id": hog["id"],
+                "alert_type": "growth_anomaly",
+                "alert_date": "2026-07-01",
+                "message": "lost condition",
+            },
+            headers=registered["headers"],
+        )
+        body = client.get(f"{API}/dashboard/alert-summary", headers=registered["headers"]).json()
+        assert body["by_status"]["open"] == 1
+        assert body["by_status"]["resolved"] == 0
+        assert body["by_type"]["growth_anomaly"] == 1
+        assert body["by_type"]["vaccination_due"] == 0
+        assert len(body["recent"]) == 1
+
+
 class TestDashboardCaching:
     def test_repeat_request_with_matching_etag_is_304(
         self, client: TestClient, registered: dict[str, Any]

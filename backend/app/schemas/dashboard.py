@@ -2,6 +2,8 @@ from datetime import date
 
 from pydantic import BaseModel, Field
 
+from app.schemas.alert import AlertRead
+
 
 class GrowthPoint(BaseModel):
     date: date
@@ -75,3 +77,73 @@ class LeaderboardResponse(BaseModel):
     metric: str
     direction: str
     rows: list[LeaderboardRow]
+
+
+class HerdGrowthPointOut(BaseModel):
+    bucket: date
+    hog_count: int
+    avg_weight_kg: float
+    median_weight_kg: float
+    p10_weight_kg: float
+    p90_weight_kg: float
+
+
+class HerdGrowthResponse(BaseModel):
+    date_from: date
+    date_to: date
+    breed_filter: str | None
+    interval: str
+    points: list[HerdGrowthPointOut]
+
+
+class DistributionRow(BaseModel):
+    key: str
+    hog_count: int
+    avg_weight_kg: float | None
+    avg_adg_kg_per_day: float | None
+
+
+class DistributionResponse(BaseModel):
+    date_from: date
+    date_to: date
+    group_by: str
+    total_hogs: int
+    rows: list[DistributionRow]
+
+
+class WeightBucketOut(BaseModel):
+    lower_kg: float
+    upper_kg: float
+    hog_count: int
+
+
+class WeightDistributionResponse(BaseModel):
+    as_of: date
+    breed_filter: str | None
+    bucket_kg: float
+    total_hogs: int
+    buckets: list[WeightBucketOut]
+
+
+class FeedCostPoint(BaseModel):
+    bucket: date
+    feed_kg: float
+    feed_cost: float
+    # Null where the herd did not gain in the bucket — either nothing was
+    # weighed twice, or it genuinely lost condition. A zero here would read as
+    # "free gain" on a chart, which is the opposite of what happened.
+    cost_per_kg_gain: float | None
+
+
+class FeedCostSeriesResponse(BaseModel):
+    date_from: date
+    date_to: date
+    interval: str
+    currency_code: str
+    points: list[FeedCostPoint]
+
+
+class AlertSummaryResponse(BaseModel):
+    by_status: dict[str, int]
+    by_type: dict[str, int]
+    recent: list[AlertRead]

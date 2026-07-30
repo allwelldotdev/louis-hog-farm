@@ -8,6 +8,7 @@ from app.core.time import as_utc, farm_today, utc_now
 from app.models.hog import ProductionClass
 from app.seed import generators as gen
 from app.services.dashboard_metrics import HogWeightEndpoints, compute_adg_rows
+from app.services.dashboard_series import compute_bucket_gains
 
 # The widest real offsets in the IANA database: +14:00 and -11:00. Between them
 # the calendar date always differs by at most one day, which is what the
@@ -104,6 +105,40 @@ class TestFarmToday:
         # A bad IANA string is a data problem; making it a 500 on every record
         # write would be a worse failure than resolving "today" in UTC.
         assert farm_today("Mars/Olympus_Mons") == farm_today("UTC")
+
+
+class TestBucketGains:
+    W1 = date(2026, 6, 1)
+    W2 = date(2026, 6, 8)
+    W3 = date(2026, 6, 15)
+
+    def test_gain_is_summed_per_hog_across_consecutive_buckets(self) -> None:
+        rows = [(self.W1, 1, 50.0), (self.W2, 1, 60.0), (self.W1, 2, 40.0), (self.W2, 2, 45.0)]
+        assert compute_bucket_gains(rows) == {self.W2: 15.0}
+
+    def test_first_bucket_has_no_gain_because_it_has_no_predecessor(self) -> None:
+        assert self.W1 not in compute_bucket_gains([(self.W1, 1, 50.0), (self.W2, 1, 60.0)])
+
+    def test_a_hog_that_arrives_mid_series_does_not_register_as_gain(self) -> None:
+        """The reason this is not a difference of herd totals.
+
+        Hog 2 appears in the second bucket only. Summing herd weight and taking
+        the difference would credit its entire 80 kg as gain the herd never put
+        on; only hog 1's real 10 kg counts.
+        """
+        rows = [(self.W1, 1, 50.0), (self.W2, 1, 60.0), (self.W2, 2, 80.0)]
+        assert compute_bucket_gains(rows) == {self.W2: 10.0}
+
+    def test_a_hog_that_leaves_does_not_register_as_loss(self) -> None:
+        rows = [(self.W1, 1, 50.0), (self.W1, 2, 80.0), (self.W2, 1, 60.0)]
+        assert compute_bucket_gains(rows) == {self.W2: 10.0}
+
+    def test_weight_loss_is_reported_as_negative(self) -> None:
+        rows = [(self.W1, 1, 60.0), (self.W2, 1, 55.0)]
+        assert compute_bucket_gains(rows) == {self.W2: -5.0}
+
+    def test_empty_input(self) -> None:
+        assert compute_bucket_gains([]) == {}
 
 
 class TestGrowthGenerator:
