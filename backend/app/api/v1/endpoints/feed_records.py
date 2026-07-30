@@ -74,9 +74,13 @@ def create_feed_record(
     _assert_record_date_not_future(body.record_date)
     rec = FeedRecord(
         hog_id=body.hog_id,
+        farm_id=user.farm_id,
         feed_amount=body.feed_amount,
         feed_cost=body.feed_cost,
-        currency_code=body.currency_code.upper(),
+        # Taken from the farm, never from the request. Client-supplied currency
+        # let one farm accumulate mixed currencies, which made the dashboard
+        # blank out every cost KPI (audit i).
+        currency_code=user.farm.currency_code,
         record_date=body.record_date,
         created_by_user_id=user.id,
         updated_by_user_id=user.id,
@@ -119,8 +123,6 @@ def update_feed_record(
         rec.feed_amount = body.feed_amount
     if body.feed_cost is not None:
         rec.feed_cost = body.feed_cost
-    if body.currency_code is not None:
-        rec.currency_code = body.currency_code.upper()
     rec.updated_by_user_id = user.id
     rec.updated_at = utc_now()
     db.add(rec)

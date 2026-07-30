@@ -8,14 +8,12 @@ class FeedRecordCreate(BaseModel):
     hog_id: int
     feed_amount: Decimal = Field(ge=0)
     feed_cost: Decimal = Field(ge=0)
-    currency_code: str = Field(default="NGN", min_length=3, max_length=3)
     record_date: date
 
 
 class FeedRecordUpdate(BaseModel):
     feed_amount: Decimal | None = Field(default=None, ge=0)
     feed_cost: Decimal | None = Field(default=None, ge=0)
-    currency_code: str | None = Field(default=None, min_length=3, max_length=3)
     record_date: date | None = None
 
 

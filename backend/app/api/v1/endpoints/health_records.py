@@ -57,6 +57,7 @@ def create_health_record(
     _assert_record_date_not_future(body.record_date)
     rec = HealthRecord(
         hog_id=body.hog_id,
+        farm_id=user.farm_id,
         weight=body.weight,
         temperature=body.temperature,
         notes=body.notes,

@@ -96,9 +96,10 @@ def seed_demo_data() -> dict[str, int]:
                     db.add(
                         FeedRecord(
                             hog_id=hog.id,
+                            farm_id=farm.id,
                             feed_amount=feed_amount,
                             feed_cost=feed_cost,
-                            currency_code="NGN",
+                            currency_code=farm.currency_code,
                             record_date=record_date,
                             created_by_user_id=manager.id,
                             updated_by_user_id=manager.id,
@@ -125,6 +126,7 @@ def seed_demo_data() -> dict[str, int]:
                     db.add(
                         HealthRecord(
                             hog_id=hog.id,
+                            farm_id=farm.id,
                             weight=weight,
                             temperature=temperature,
                             notes=notes,

@@ -46,6 +46,7 @@ def create_alert(
         get_alert_rule_in_farm(db, body.alert_rule_id, user.farm_id)
     alert = Alert(
         hog_id=body.hog_id,
+        farm_id=user.farm_id,
         alert_rule_id=body.alert_rule_id,
         alert_type=body.alert_type,
         alert_date=body.alert_date,

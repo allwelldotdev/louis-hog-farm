@@ -10,7 +10,7 @@ from app.api.deps import CurrentUser, ManagerUser
 from app.core.time import utc_now, utc_today
 from app.db.session import get_db
 from app.models.breeding_cycle import BreedingCycle, BreedingStatus
-from app.models.hog import Hog
+from app.models.hog import BREEDING_CLASSES, Hog
 from app.schemas.breeding import BreedingCycleCreate, BreedingCycleRead, BreedingCycleUpdate
 
 router = APIRouter(prefix="/breeding-cycles", tags=["breeding-cycles"])
@@ -62,10 +62,21 @@ def create_breeding_cycle(
     user: ManagerUser,
     body: BreedingCycleCreate,
 ) -> BreedingCycle:
-    get_hog_in_farm(db, body.hog_id, user.farm_id)
+    hog = get_hog_in_farm(db, body.hog_id, user.farm_id)
+    # Only breeding females can carry a cycle. Before production_class existed
+    # nothing stopped a cycle being opened against a piglet or a boar.
+    if hog.production_class not in BREEDING_CLASSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Hog {hog.tag_number} is a {hog.production_class.value}; "
+                "breeding cycles apply to sows and gilts only"
+            ),
+        )
     _assert_not_future(body.start_date)
     cycle = BreedingCycle(
         hog_id=body.hog_id,
+        farm_id=user.farm_id,
         start_date=body.start_date,
         status=BreedingStatus.ongoing,
         notes=body.notes,

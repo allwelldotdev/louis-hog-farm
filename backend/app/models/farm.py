@@ -17,6 +17,20 @@ class Farm(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Currency lives on the farm, not on each feed record. Per-record currency
+    # allowed a farm to accumulate mixed currencies, which made the dashboard
+    # null out every cost KPI (audit i). The platform is single-currency (NGN)
+    # for now; this column is what a future per-farm currency picker and FX
+    # conversion would hang off, so it exists rather than being hardcoded.
+    currency_code: Mapped[str] = mapped_column(
+        String(3), nullable=False, server_default="NGN", default="NGN"
+    )
+    # IANA zone. "Today" must be evaluated in the farm's local time: for a farm
+    # at UTC+1, a same-day entry made after 23:00 local is otherwise rejected as
+    # being in the future.
+    timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default="UTC", default="UTC"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
