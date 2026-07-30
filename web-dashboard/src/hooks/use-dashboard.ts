@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { apiGet } from '@/lib/api/client'
-import type { DashboardKpis } from '@/lib/api/types'
+import type { DashboardKpis, HerdGrowth } from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
 
 /**
@@ -19,5 +19,12 @@ export function useKpis() {
   return useQuery({
     queryKey: queryKeys.dashboard('kpis'),
     queryFn: () => apiGet<DashboardKpis>('/dashboard/kpis'),
+  })
+}
+
+export function useHerdGrowth() {
+  return useQuery({
+    queryKey: queryKeys.dashboard('herd-growth'),
+    queryFn: () => apiGet<HerdGrowth>('/dashboard/herd-growth'),
   })
 }

@@ -1,3 +1,4 @@
+import { HerdGrowthChart } from '@/components/dashboard/charts/herd-growth-chart'
 import { FarmOverview } from '@/components/dashboard/farm-overview'
 import { KpiRow } from '@/components/dashboard/kpi-row'
 
@@ -10,6 +11,7 @@ export default function DashboardPage() {
       </div>
 
       <KpiRow />
+      <HerdGrowthChart />
       <FarmOverview />
     </div>
   )
