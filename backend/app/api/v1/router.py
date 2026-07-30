@@ -12,7 +12,9 @@ from app.api.v1.endpoints import (
     health_records,
     hogs,
     meta,
+    mortality_events,
     users,
+    vaccinations,
 )
 
 api_router = APIRouter()
@@ -23,6 +25,8 @@ api_router.include_router(users.router)
 api_router.include_router(hogs.router)
 api_router.include_router(feed_records.router)
 api_router.include_router(health_records.router)
+api_router.include_router(vaccinations.router)
+api_router.include_router(mortality_events.router)
 api_router.include_router(breeding_cycles.router)
 api_router.include_router(alert_rules.router)
 api_router.include_router(alerts.router)

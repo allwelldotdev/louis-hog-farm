@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -549,6 +550,150 @@ class TestDashboardCaching:
         a = client.get(f"{API}/dashboard/kpis?breed=Duroc", headers=registered["headers"])
         b = client.get(f"{API}/dashboard/kpis?breed=Landrace", headers=registered["headers"])
         assert a.headers["etag"] != b.headers["etag"]
+
+
+class TestUsers:
+    def test_roster_is_scoped_to_the_managers_farm(self, client: TestClient) -> None:
+        managers = []
+        for tag in ("p", "q"):
+            client.post(
+                f"{API}/auth/register",
+                json={
+                    "email": f"{tag}@example.com",
+                    "password": "Password123",
+                    "full_name": tag,
+                    "farm_name": f"Farm {tag}",
+                },
+            )
+            tok = client.post(
+                f"{API}/auth/login",
+                data={"username": f"{tag}@example.com", "password": "Password123"},
+            ).json()["access_token"]
+            managers.append({"Authorization": f"Bearer {tok}"})
+        body = client.get(f"{API}/users", headers=managers[0]).json()
+        assert body["total"] == 1
+        assert body["items"][0]["email"] == "p@example.com"
+
+    def test_a_worker_cannot_enumerate_the_roster(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        client.post(
+            f"{API}/users",
+            json={
+                "email": "worker@example.com",
+                "password": "Password123",
+                "full_name": "W",
+                "role": "worker",
+            },
+            headers=registered["headers"],
+        )
+        tok = client.post(
+            f"{API}/auth/login",
+            data={"username": "worker@example.com", "password": "Password123"},
+        ).json()["access_token"]
+        r = client.get(f"{API}/users", headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 403
+
+
+class TestVaccinations:
+    def test_create_and_list(self, client: TestClient, registered: dict[str, Any]) -> None:
+        hog = _make_hog(client, registered, tag_number="VAC-1")
+        r = client.post(
+            f"{API}/vaccinations",
+            json={
+                "hog_id": hog["id"],
+                "vaccine_name": "Erysipelas",
+                "dose_date": "2026-07-01",
+                "next_due_date": "2026-10-01",
+            },
+            headers=registered["headers"],
+        )
+        assert r.status_code == 201
+        assert r.json()["next_due_date"] == "2026-10-01"
+        listed = client.get(f"{API}/vaccinations", headers=registered["headers"]).json()
+        assert listed["total"] == 1
+
+    def test_due_before_filters_to_upcoming_doses(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        hog = _make_hog(client, registered, tag_number="VAC-2")
+        for due in ("2026-08-01", "2026-12-01"):
+            client.post(
+                f"{API}/vaccinations",
+                json={
+                    "hog_id": hog["id"],
+                    "vaccine_name": "Mycoplasma",
+                    "dose_date": "2026-07-01",
+                    "next_due_date": due,
+                },
+                headers=registered["headers"],
+            )
+        body = client.get(
+            f"{API}/vaccinations?due_before=2026-09-01", headers=registered["headers"]
+        ).json()
+        assert body["total"] == 1
+
+    def test_next_due_before_dose_date_is_rejected(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        hog = _make_hog(client, registered, tag_number="VAC-3")
+        r = client.post(
+            f"{API}/vaccinations",
+            json={
+                "hog_id": hog["id"],
+                "vaccine_name": "PCV2",
+                "dose_date": "2026-07-01",
+                "next_due_date": "2026-06-01",
+            },
+            headers=registered["headers"],
+        )
+        assert r.status_code == 400
+
+
+class TestMortalityEvents:
+    def _record_death(
+        self, client: TestClient, auth: dict[str, Any], hog_id: int
+    ) -> httpx.Response:
+        return client.post(
+            f"{API}/mortality-events",
+            json={"hog_id": hog_id, "event_date": "2026-07-01", "cause": "scour"},
+            headers=auth["headers"],
+        )
+
+    def test_recording_a_death_moves_the_hog_to_deceased(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """The two are one fact.
+
+        Leaving the status change to a separate PATCH would let a farm hold
+        deaths whose animals still count as live herd, which is exactly how the
+        mortality rate goes wrong.
+        """
+        hog = _make_hog(client, registered, tag_number="MORT-1")
+        assert self._record_death(client, registered, hog["id"]).status_code == 201
+        after = client.get(f"{API}/hogs/{hog['id']}", headers=registered["headers"]).json()
+        assert after["status"] == "deceased"
+
+    def test_a_second_death_for_the_same_hog_is_409(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        hog = _make_hog(client, registered, tag_number="MORT-2")
+        self._record_death(client, registered, hog["id"])
+        assert self._record_death(client, registered, hog["id"]).status_code == 409
+
+    def test_deaths_show_up_in_the_kpi_mortality_figures(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        hog = _make_hog(client, registered, tag_number="MORT-3")
+        _make_hog(client, registered, tag_number="MORT-alive")
+        self._record_death(client, registered, hog["id"])
+        body = client.get(
+            f"{API}/dashboard/kpis?date_from=2026-06-01&date_to=2026-07-31",
+            headers=registered["headers"],
+        ).json()
+        assert body["mortality_count"] == 1
+        # One dead, one alive: the denominator counts the population at risk.
+        assert body["mortality_rate_pct"] == 50.0
 
 
 class TestExports:

@@ -5,12 +5,30 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, ManagerUser
+from app.api.pagination import PageParams, paginate
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.pagination import Page
 from app.schemas.user import UserCreateStaff, UserRead
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("", response_model=Page[UserRead])
+def list_users(
+    db: Annotated[Session, Depends(get_db)],
+    manager: ManagerUser,
+    page: PageParams,
+) -> Page[UserRead]:
+    """Staff on the signed-in user's farm. Manager-only.
+
+    Scoped to `manager.farm_id`, not to every user: the roster is farm data like
+    any other, and a worker has no business enumerating their colleagues'
+    accounts.
+    """
+    stmt = select(User).where(User.farm_id == manager.farm_id).order_by(User.id)
+    return paginate(db, stmt, page, UserRead)
 
 
 @router.get("/me", response_model=UserRead)
