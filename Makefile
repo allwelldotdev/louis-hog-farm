@@ -17,7 +17,7 @@ endif
 
 .PHONY: help env-check install db-up db-down db-wait psql db-reset migrate migrate-down \
         revision seed seed-bulk seed-reset api web up up-all down logs build ps lint fmt \
-        typecheck test check clean
+        typecheck test check types build-web clean
 
 ## ---------------------------------------------------------------- help ----
 
@@ -131,7 +131,15 @@ test: ## Run the backend test suite
 
 check: lint typecheck test ## Run everything the Stop-hook quality gate runs
 
+types: ## Regenerate dashboard API types from the running backend's OpenAPI document
+	@curl -sf http://127.0.0.1:8000/openapi.json >/dev/null \
+		|| { echo "ERROR: the API must be running. Start it with: make api"; exit 1; }
+	cd $(WEB) && npm run types
+
+build-web: ## Production build of the dashboard (run before `tsc` — it generates .next/types)
+	cd $(WEB) && npm run build
+
 clean: ## Remove caches and build artefacts
 	rm -rf $(BACKEND)/.mypy_cache $(BACKEND)/.pytest_cache $(BACKEND)/.ruff_cache
-	rm -rf $(WEB)/.next $(WEB)/dist
+	rm -rf $(WEB)/.next $(WEB)/*.tsbuildinfo
 	find . -name '__pycache__' -type d -not -path './*/node_modules/*' -prune -exec rm -rf {} +

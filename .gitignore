@@ -24,6 +24,10 @@ build/
 node_modules/
 web-dashboard/.next/
 web-dashboard/next-env.d.ts
+
+# Playwright MCP drops screenshots and page snapshots here when the dashboard is
+# driven for verification or Chapter 4 evidence. Working artefacts, not sources.
+.playwright-mcp/
 web-dashboard/.tsbuildinfo
 web-dashboard/*.tsbuildinfo
 npm-debug.log*
