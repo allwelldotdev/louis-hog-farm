@@ -1,7 +1,9 @@
+import { AlertSummaryPanel } from '@/components/dashboard/alert-summary-panel'
 import {
   BreedDistributionChart,
   ProductionClassDistributionChart,
 } from '@/components/dashboard/charts/distribution-chart'
+import { FeedCostChart } from '@/components/dashboard/charts/feed-cost-chart'
 import { HerdGrowthChart } from '@/components/dashboard/charts/herd-growth-chart'
 import { WeightDistributionChart } from '@/components/dashboard/charts/weight-distribution-chart'
 import { FarmOverview } from '@/components/dashboard/farm-overview'
@@ -24,7 +26,12 @@ export default function DashboardPage() {
       </div>
 
       <WeightDistributionChart />
-      <FarmOverview />
+      <FeedCostChart />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AlertSummaryPanel />
+        <FarmOverview />
+      </div>
     </div>
   )
 }

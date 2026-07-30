@@ -3,7 +3,14 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { apiGet } from '@/lib/api/client'
-import type { DashboardKpis, Distribution, HerdGrowth, WeightDistribution } from '@/lib/api/types'
+import type {
+  AlertSummary,
+  DashboardKpis,
+  Distribution,
+  FeedCostSeries,
+  HerdGrowth,
+  WeightDistribution,
+} from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
 
 /**
@@ -49,5 +56,21 @@ export function useWeightDistribution() {
   return useQuery({
     queryKey: queryKeys.dashboard('weight-distribution'),
     queryFn: () => apiGet<WeightDistribution>('/dashboard/weight-distribution'),
+  })
+}
+
+export function useFeedCostSeries() {
+  return useQuery({
+    queryKey: queryKeys.dashboard('feed-cost-series'),
+    queryFn: () => apiGet<FeedCostSeries>('/dashboard/feed-cost-series'),
+  })
+}
+
+/** Deliberately unfiltered by date: an alert raised outside the dashboard's
+ *  window and still open is precisely the one worth surfacing. */
+export function useAlertSummary() {
+  return useQuery({
+    queryKey: queryKeys.dashboard('alert-summary'),
+    queryFn: () => apiGet<AlertSummary>('/dashboard/alert-summary'),
   })
 }

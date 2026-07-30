@@ -44,6 +44,25 @@ export function formatMoney(value: number | null | undefined, currency: string):
   }).format(value)
 }
 
+/** Money on a chart axis. A full `NGN 538,270` is wider than the plot area it
+ *  labels, and an axis only has to convey magnitude. */
+export function formatMoneyCompact(value: number | null | undefined, currency: string): string {
+  if (value === null || value === undefined) return NO_VALUE
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+/** `growth_anomaly` → `Growth anomaly`. The API's enum values are snake_case
+ *  identifiers; screens show them to people. */
+export function humanize(key: string): string {
+  const spaced = key.replace(/_/g, ' ')
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
 export function formatNumber(value: number | null | undefined, fractionDigits = 2): string {
   if (value === null || value === undefined) return NO_VALUE
   return new Intl.NumberFormat(undefined, {

@@ -13,7 +13,7 @@ import {
 } from '@/components/dashboard/charts/chart-primitives'
 import { useBreedDistribution, useProductionClassDistribution } from '@/hooks/use-dashboard'
 import type { Distribution } from '@/lib/api/types'
-import { formatInteger, formatNumber, formatPercent } from '@/lib/format'
+import { formatInteger, formatNumber, formatPercent, humanize } from '@/lib/format'
 
 /**
  * Herd composition, grouped by whatever the endpoint grouped it by.
@@ -38,10 +38,6 @@ export const PRODUCTION_CLASS_ORDER = [
   'sow',
   'boar',
 ] as const
-
-function label(key: string): string {
-  return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')
-}
 
 export function BreedDistributionChart() {
   return (
@@ -97,7 +93,7 @@ export function DistributionChart({
 
   const data = sorted.map((row) => ({
     key: row.key,
-    label: label(row.key),
+    label: humanize(row.key),
     hogCount: row.hog_count,
     avgWeight: row.avg_weight_kg,
     avgAdg: row.avg_adg_kg_per_day,
