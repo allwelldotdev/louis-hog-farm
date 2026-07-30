@@ -1,0 +1,43 @@
+[project]
+name = "hog-farm-backend"
+version = "0.1.0"
+description = "Hog Farm Monitoring API (FastAPI)"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "sqlalchemy==2.0.36",
+    "psycopg2-binary==2.9.10",
+    "alembic==1.14.0",
+    "pydantic==2.10.3",
+    "pydantic-settings==2.6.1",
+    "email-validator==2.2.0",
+    "python-jose[cryptography]==3.3.0",
+    "python-multipart==0.0.17",
+    "argon2-cffi==23.1.0",
+]
+
+# Mirrors requirements.txt above, which is kept as the historical pinned
+# reference. New dependencies should be added via `uv add` from here on.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_optional = true
+plugins = ["pydantic.mypy"]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.0",
+    "pytest>=9.1.1",
+    "ruff>=0.16.0",
+]

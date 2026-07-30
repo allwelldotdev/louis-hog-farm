@@ -1,5 +1,5 @@
 {
-  "name": "hog-farm-frontend",
+  "name": "hog-farm-dashboard",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -14,7 +14,14 @@
     "react-router-dom": "^6.14.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.8.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
     "vite": "^5.4.0"
   }
 }
