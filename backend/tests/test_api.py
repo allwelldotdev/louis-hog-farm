@@ -121,6 +121,68 @@ class TestHogs:
         )
         assert r.status_code == 409
 
+    def test_domain_fields_round_trip(self, client: TestClient, registered: dict[str, Any]) -> None:
+        created = _make_hog(
+            client, registered, tag_number="DOM-1", sex="male", production_class="boar"
+        )
+        assert created["sex"] == "male"
+        assert created["production_class"] == "boar"
+        fetched = client.get(f"{API}/hogs/{created['id']}", headers=registered["headers"]).json()
+        assert fetched["production_class"] == "boar"
+
+    def test_production_class_can_be_advanced(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """piglet -> weaner is herd management, not a correction."""
+        hog = _make_hog(client, registered, tag_number="DOM-2")
+        r = client.patch(
+            f"{API}/hogs/{hog['id']}",
+            json={"production_class": "weaner"},
+            headers=registered["headers"],
+        )
+        assert r.status_code == 200
+        assert r.json()["production_class"] == "weaner"
+
+    def test_list_can_be_filtered_by_production_class(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _make_hog(client, registered, tag_number="DOM-3", production_class="sow")
+        _make_hog(client, registered, tag_number="DOM-4")
+        body = client.get(f"{API}/hogs?production_class=sow", headers=registered["headers"]).json()
+        assert body["total"] == 1
+        assert body["items"][0]["tag_number"] == "DOM-3"
+
+    def test_a_dam_from_another_farm_is_rejected(self, client: TestClient) -> None:
+        """Lineage ids arrive from the client, so they are checked, not trusted."""
+        auths = []
+        for tag in ("m", "n"):
+            client.post(
+                f"{API}/auth/register",
+                json={
+                    "email": f"{tag}@example.com",
+                    "password": "Password123",
+                    "full_name": tag,
+                    "farm_name": f"Farm {tag}",
+                },
+            )
+            tok = client.post(
+                f"{API}/auth/login",
+                data={"username": f"{tag}@example.com", "password": "Password123"},
+            ).json()["access_token"]
+            auths.append({"headers": {"Authorization": f"Bearer {tok}"}})
+        foreign_dam = _make_hog(client, auths[0], tag_number="FOREIGN-DAM")
+        r = client.post(
+            f"{API}/hogs",
+            json={
+                "tag_number": "PIGLET-1",
+                "birth_date": "2026-05-01",
+                "breed": "Duroc",
+                "dam_id": foreign_dam["id"],
+            },
+            headers=auths[1]["headers"],
+        )
+        assert r.status_code == 404
+
     def test_another_farms_hog_is_not_visible(self, client: TestClient) -> None:
         """404 rather than 403 — a 403 would confirm the row exists."""
         farms = []

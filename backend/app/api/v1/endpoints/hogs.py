@@ -10,7 +10,7 @@ from app.api.deps import CurrentUser, MutatorUser, is_manager_like
 from app.api.pagination import PageParams, paginate
 from app.core.time import utc_now
 from app.db.session import get_db
-from app.models.hog import Hog, HogStatus
+from app.models.hog import Hog, HogStatus, ProductionClass
 from app.models.user import UserRole
 from app.schemas.dashboard import GrowthPoint, GrowthSeriesResponse
 from app.schemas.hog import HogCreate, HogRead, HogUpdate
@@ -39,11 +39,27 @@ def list_hogs(
     user: CurrentUser,
     page: PageParams,
     status_filter: HogStatus | None = Query(default=None, alias="status"),
+    breed: str | None = None,
+    production_class: ProductionClass | None = None,
 ) -> Page[HogRead]:
     stmt = select(Hog).where(Hog.farm_id == user.farm_id).order_by(Hog.id)
     if status_filter is not None:
         stmt = stmt.where(Hog.status == status_filter)
+    if breed is not None:
+        stmt = stmt.where(Hog.breed == breed)
+    if production_class is not None:
+        stmt = stmt.where(Hog.production_class == production_class)
     return paginate(db, stmt, page, HogRead)
+
+
+def _assert_parents_in_farm(
+    db: Session, farm_id: int, dam_id: int | None, sire_id: int | None
+) -> None:
+    # Lineage ids come from the client, so they are checked rather than trusted:
+    # an unchecked dam_id is a hog id from another farm waiting to be linked.
+    for parent_id in (dam_id, sire_id):
+        if parent_id is not None:
+            get_hog_in_farm(db, parent_id, farm_id)
 
 
 @router.post("", response_model=HogRead, status_code=status.HTTP_201_CREATED)
@@ -57,11 +73,16 @@ def create_hog(
             status_code=status.HTTP_409_CONFLICT,
             detail="An active hog with this tag number already exists on the farm",
         )
+    _assert_parents_in_farm(db, user.farm_id, body.dam_id, body.sire_id)
     hog = Hog(
         farm_id=user.farm_id,
         tag_number=body.tag_number,
         birth_date=body.birth_date,
         breed=body.breed,
+        sex=body.sex,
+        production_class=body.production_class,
+        dam_id=body.dam_id,
+        sire_id=body.sire_id,
         status=HogStatus.active,
         created_by_user_id=user.id,
         updated_by_user_id=user.id,
@@ -126,6 +147,7 @@ def update_hog(
             status_code=status.HTTP_409_CONFLICT,
             detail="An active hog with this tag number already exists on the farm",
         )
+    _assert_parents_in_farm(db, user.farm_id, body.dam_id, body.sire_id)
     if body.tag_number is not None:
         hog.tag_number = body.tag_number
     if body.birth_date is not None:
@@ -134,6 +156,14 @@ def update_hog(
         hog.breed = body.breed
     if body.status is not None:
         hog.status = body.status
+    if body.sex is not None:
+        hog.sex = body.sex
+    if body.production_class is not None:
+        hog.production_class = body.production_class
+    if body.dam_id is not None:
+        hog.dam_id = body.dam_id
+    if body.sire_id is not None:
+        hog.sire_id = body.sire_id
     hog.updated_by_user_id = user.id
     hog.updated_at = utc_now()
     db.add(hog)
