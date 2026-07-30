@@ -1,0 +1,7 @@
+.next
+node_modules
+next-env.d.ts
+
+# Machine output from `make types` — reformatting it only creates diff noise
+# the next regeneration throws away.
+src/lib/api/schema.d.ts

@@ -22,8 +22,10 @@ build/
 
 # --- Node / web-dashboard ---
 node_modules/
-web-dashboard/dist/
-web-dashboard/.vite/
+web-dashboard/.next/
+web-dashboard/next-env.d.ts
+web-dashboard/.tsbuildinfo
+web-dashboard/*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
