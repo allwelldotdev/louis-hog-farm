@@ -16,7 +16,7 @@ from app.services.dashboard_metrics import (
     compute_adg_rows,
     count_feed_records_in_range,
     count_health_records_in_range,
-    fetch_health_points_in_range,
+    fetch_weight_endpoints_in_range,
     market_ready_stats,
     total_feed_cost_in_range,
     total_weight_gain_kg,
@@ -52,10 +52,10 @@ def get_dashboard_kpis(
     ),
 ) -> DashboardKpisResponse:
     start, end = _default_range(date_from, date_to)
-    points = fetch_health_points_in_range(db, user.farm_id, start, end, breed)
+    endpoints = fetch_weight_endpoints_in_range(db, user.farm_id, start, end, breed)
     health_records_count = count_health_records_in_range(db, user.farm_id, start, end, breed)
     feed_records_count = count_feed_records_in_range(db, user.farm_id, start, end, breed)
-    adg_rows = compute_adg_rows(points)
+    adg_rows = compute_adg_rows(endpoints)
     avg_adg = sum(r.adg_kg_per_day for r in adg_rows) / len(adg_rows) if adg_rows else None
     gain_total = total_weight_gain_kg(adg_rows)
     feed_grand, feed_by_ccy = total_feed_cost_in_range(db, user.farm_id, start, end, breed)
@@ -70,33 +70,28 @@ def get_dashboard_kpis(
         if gain_total > 0 and feed_by_ccy:
             per_kg = float(next(iter(feed_by_ccy.values()))) / gain_total
 
-    under: list[UnderperformerRow] = []
-    if adg_rows and avg_adg is not None and avg_adg > 0:
-        threshold = max(0.35, 0.85 * avg_adg)
-        for r in sorted(adg_rows, key=lambda x: x.adg_kg_per_day):
-            if r.adg_kg_per_day < threshold:
-                under.append(
-                    UnderperformerRow(
-                        hog_id=r.hog_id,
-                        tag_number=r.tag_number,
-                        breed=r.breed,
-                        adg_kg_per_day=r.adg_kg_per_day,
-                    )
-                )
-    elif adg_rows:
-        for r in sorted(adg_rows, key=lambda x: x.adg_kg_per_day):
-            if r.adg_kg_per_day < 0.35:
-                under.append(
-                    UnderperformerRow(
-                        hog_id=r.hog_id,
-                        tag_number=r.tag_number,
-                        breed=r.breed,
-                        adg_kg_per_day=r.adg_kg_per_day,
-                    )
-                )
+    # Below 85% of the herd average, floored at 0.35 kg/day so a uniformly poor
+    # herd does not flag everyone as merely "below average".
+    threshold = max(0.35, 0.85 * avg_adg) if avg_adg and avg_adg > 0 else 0.35
+    under = [
+        UnderperformerRow(
+            hog_id=r.hog_id,
+            tag_number=r.tag_number,
+            breed=r.breed,
+            adg_kg_per_day=r.adg_kg_per_day,
+        )
+        for r in sorted(adg_rows, key=lambda x: x.adg_kg_per_day)[:50]
+        if r.adg_kg_per_day < threshold
+    ]
 
-    ready, active = market_ready_stats(db, user.farm_id, end, breed, market_weight_kg)
-    mkt_pct = (ready / active * 100.0) if active else None
+    readiness = market_ready_stats(db, user.farm_id, end, breed, market_weight_kg)
+    # Percentage is over hogs actually weighed: an unweighed hog is unknown,
+    # not "not ready", and counting it as the latter depressed the figure.
+    mkt_pct = (
+        (readiness.ready_count / readiness.measured_count * 100.0)
+        if readiness.measured_count
+        else None
+    )
 
     return DashboardKpisResponse(
         date_from=start,
@@ -114,8 +109,9 @@ def get_dashboard_kpis(
             for k, v in sorted(feed_by_ccy.items())
         ],
         feed_cost_per_kg_gain=per_kg,
-        market_ready_count=ready,
-        active_hogs_count=active,
+        market_ready_count=readiness.ready_count,
+        active_hogs_count=readiness.active_count,
+        market_ready_measured_count=readiness.measured_count,
         market_ready_pct=mkt_pct,
-        underperformers=under[:50],
+        underperformers=under,
     )

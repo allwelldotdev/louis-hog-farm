@@ -5,20 +5,23 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, ManagerUser
+from app.api.pagination import PageParams, paginate
 from app.db.session import get_db
 from app.models.alert import AlertRule
 from app.schemas.alert import AlertRuleCreate, AlertRuleRead, AlertRuleUpdate
+from app.schemas.pagination import Page
 
 router = APIRouter(prefix="/alert-rules", tags=["alert-rules"])
 
 
-@router.get("", response_model=list[AlertRuleRead])
+@router.get("", response_model=Page[AlertRuleRead])
 def list_alert_rules(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
-) -> list[AlertRule]:
+    page: PageParams,
+) -> Page[AlertRuleRead]:
     stmt = select(AlertRule).where(AlertRule.farm_id == user.farm_id).order_by(AlertRule.id)
-    return list(db.scalars(stmt).all())
+    return paginate(db, stmt, page, AlertRuleRead)
 
 
 @router.post("", response_model=AlertRuleRead, status_code=status.HTTP_201_CREATED)

@@ -7,11 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, ManagerUser
+from app.api.pagination import PageParams, paginate
 from app.core.time import utc_now, utc_today
 from app.db.session import get_db
 from app.models.breeding_cycle import BreedingCycle, BreedingStatus
-from app.models.hog import BREEDING_CLASSES, Hog
+from app.models.hog import BREEDING_CLASSES
 from app.schemas.breeding import BreedingCycleCreate, BreedingCycleRead, BreedingCycleUpdate
+from app.schemas.pagination import Page
 
 router = APIRouter(prefix="/breeding-cycles", tags=["breeding-cycles"])
 
@@ -38,22 +40,19 @@ def _validate_cycle_dates(start: date, end: date | None, new_status: BreedingSta
         )
 
 
-@router.get("", response_model=list[BreedingCycleRead])
+@router.get("", response_model=Page[BreedingCycleRead])
 def list_breeding_cycles(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    page: PageParams,
     hog_id: int | None = None,
-) -> list[BreedingCycle]:
-    stmt = (
-        select(BreedingCycle)
-        .join(Hog, BreedingCycle.hog_id == Hog.id)
-        .where(Hog.farm_id == user.farm_id)
-    )
+) -> Page[BreedingCycleRead]:
+    stmt = select(BreedingCycle).where(BreedingCycle.farm_id == user.farm_id)
     if hog_id is not None:
         get_hog_in_farm(db, hog_id, user.farm_id)
         stmt = stmt.where(BreedingCycle.hog_id == hog_id)
     stmt = stmt.order_by(BreedingCycle.start_date.desc(), BreedingCycle.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate(db, stmt, page, BreedingCycleRead)
 
 
 @router.post("", response_model=BreedingCycleRead, status_code=status.HTTP_201_CREATED)

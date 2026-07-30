@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser, is_manager_like
+from app.api.pagination import PageParams, paginate
 from app.core.time import utc_now
 from app.db.session import get_db
 from app.models.hog import Hog, HogStatus
 from app.models.user import UserRole
 from app.schemas.dashboard import GrowthPoint, GrowthSeriesResponse
 from app.schemas.hog import HogCreate, HogRead, HogUpdate
+from app.schemas.pagination import Page
 from app.services.dashboard_metrics import fetch_growth_series_for_hog
 
 router = APIRouter(prefix="/hogs", tags=["hogs"])
@@ -31,16 +33,17 @@ def _active_tag_taken(
     return db.scalar(stmt) is not None
 
 
-@router.get("", response_model=list[HogRead])
+@router.get("", response_model=Page[HogRead])
 def list_hogs(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    page: PageParams,
     status_filter: HogStatus | None = Query(default=None, alias="status"),
-) -> list[Hog]:
+) -> Page[HogRead]:
     stmt = select(Hog).where(Hog.farm_id == user.farm_id).order_by(Hog.id)
     if status_filter is not None:
         stmt = stmt.where(Hog.status == status_filter)
-    return list(db.scalars(stmt).all())
+    return paginate(db, stmt, page, HogRead)
 
 
 @router.post("", response_model=HogRead, status_code=status.HTTP_201_CREATED)

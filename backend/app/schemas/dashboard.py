@@ -43,5 +43,6 @@ class DashboardKpisResponse(BaseModel):
     feed_cost_per_kg_gain: float | None
     market_ready_count: int
     active_hogs_count: int
+    market_ready_measured_count: int
     market_ready_pct: float | None
     underperformers: list[UnderperformerRow]

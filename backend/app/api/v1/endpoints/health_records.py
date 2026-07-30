@@ -7,11 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser
+from app.api.pagination import PageParams, paginate
 from app.core.time import utc_now, utc_today
 from app.db.session import get_db
 from app.models.health_record import HealthRecord
-from app.models.hog import Hog
 from app.schemas.health import HealthRecordCreate, HealthRecordRead, HealthRecordUpdate
+from app.schemas.pagination import Page
 
 router = APIRouter(prefix="/health-records", tags=["health-records"])
 
@@ -23,19 +24,16 @@ def _assert_record_date_not_future(d: date) -> None:
         )
 
 
-@router.get("", response_model=list[HealthRecordRead])
+@router.get("", response_model=Page[HealthRecordRead])
 def list_health_records(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    page: PageParams,
     hog_id: int | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
-) -> list[HealthRecord]:
-    stmt = (
-        select(HealthRecord)
-        .join(Hog, HealthRecord.hog_id == Hog.id)
-        .where(Hog.farm_id == user.farm_id)
-    )
+) -> Page[HealthRecordRead]:
+    stmt = select(HealthRecord).where(HealthRecord.farm_id == user.farm_id)
     if hog_id is not None:
         get_hog_in_farm(db, hog_id, user.farm_id)
         stmt = stmt.where(HealthRecord.hog_id == hog_id)
@@ -44,7 +42,7 @@ def list_health_records(
     if date_to is not None:
         stmt = stmt.where(HealthRecord.record_date <= date_to)
     stmt = stmt.order_by(HealthRecord.record_date.desc(), HealthRecord.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate(db, stmt, page, HealthRecordRead)
 
 
 @router.post("", response_model=HealthRecordRead, status_code=status.HTTP_201_CREATED)

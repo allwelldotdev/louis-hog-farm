@@ -29,7 +29,7 @@ help: ## List available targets
 
 env-check: ## Verify .env exists and carries the required values
 	@test -f .env || { echo "ERROR: .env is missing. Run: cp .env.example .env"; exit 1; }
-	@grep -qE '^JWT_SECRET=.\{32,\}' .env \
+	@grep -qE '^JWT_SECRET=.{32,}' .env \
 		|| { echo "ERROR: JWT_SECRET in .env must be >= 32 chars (openssl rand -hex 32)"; exit 1; }
 	@grep -qE '^DATABASE_URL=postgresql' .env \
 		|| { echo "ERROR: DATABASE_URL in .env must be a postgresql:// URL"; exit 1; }

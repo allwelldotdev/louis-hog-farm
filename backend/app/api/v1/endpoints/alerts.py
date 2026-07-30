@@ -6,24 +6,26 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_alert_rule_in_farm, get_hog_in_farm
 from app.api.deps import CurrentUser, ManagerUser
+from app.api.pagination import PageParams, paginate
 from app.core.time import utc_now
 from app.db.session import get_db
 from app.models.alert import Alert, AlertStatus, AlertType
-from app.models.hog import Hog
 from app.schemas.alert import AlertCreate, AlertRead, AlertUpdate
+from app.schemas.pagination import Page
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
-@router.get("", response_model=list[AlertRead])
+@router.get("", response_model=Page[AlertRead])
 def list_alerts(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    page: PageParams,
     hog_id: int | None = None,
     status_filter: AlertStatus | None = Query(default=None, alias="status"),
     alert_type: AlertType | None = None,
-) -> list[Alert]:
-    stmt = select(Alert).join(Hog, Alert.hog_id == Hog.id).where(Hog.farm_id == user.farm_id)
+) -> Page[AlertRead]:
+    stmt = select(Alert).where(Alert.farm_id == user.farm_id)
     if hog_id is not None:
         get_hog_in_farm(db, hog_id, user.farm_id)
         stmt = stmt.where(Alert.hog_id == hog_id)
@@ -32,7 +34,7 @@ def list_alerts(
     if alert_type is not None:
         stmt = stmt.where(Alert.alert_type == alert_type)
     stmt = stmt.order_by(Alert.alert_date.desc(), Alert.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate(db, stmt, page, AlertRead)
 
 
 @router.post("", response_model=AlertRead, status_code=status.HTTP_201_CREATED)

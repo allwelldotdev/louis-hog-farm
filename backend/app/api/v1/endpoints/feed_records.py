@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.api.access import get_hog_in_farm
 from app.api.deps import CurrentUser, MutatorUser, is_manager_like
+from app.api.pagination import PageParams, paginate
 from app.core.time import utc_now, utc_today
 from app.db.session import get_db
 from app.models.feed_record import FeedRecord
-from app.models.hog import Hog
 from app.models.user import User
 from app.schemas.feed import FeedRecordCreate, FeedRecordRead, FeedRecordUpdate
+from app.schemas.pagination import Page
 
 router = APIRouter(prefix="/feed-records", tags=["feed-records"])
 
@@ -42,17 +43,16 @@ def _assert_can_edit_feed(user: User, rec: FeedRecord) -> None:
     )
 
 
-@router.get("", response_model=list[FeedRecordRead])
+@router.get("", response_model=Page[FeedRecordRead])
 def list_feed_records(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    page: PageParams,
     hog_id: int | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
-) -> list[FeedRecord]:
-    stmt = (
-        select(FeedRecord).join(Hog, FeedRecord.hog_id == Hog.id).where(Hog.farm_id == user.farm_id)
-    )
+) -> Page[FeedRecordRead]:
+    stmt = select(FeedRecord).where(FeedRecord.farm_id == user.farm_id)
     if hog_id is not None:
         get_hog_in_farm(db, hog_id, user.farm_id)
         stmt = stmt.where(FeedRecord.hog_id == hog_id)
@@ -61,7 +61,7 @@ def list_feed_records(
     if date_to is not None:
         stmt = stmt.where(FeedRecord.record_date <= date_to)
     stmt = stmt.order_by(FeedRecord.record_date.desc(), FeedRecord.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate(db, stmt, page, FeedRecordRead)
 
 
 @router.post("", response_model=FeedRecordRead, status_code=status.HTTP_201_CREATED)
