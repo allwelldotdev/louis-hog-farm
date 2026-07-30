@@ -56,7 +56,8 @@ describe('HerdGrowthChart', () => {
     const band = container.querySelector<SVGPathElement>('.recharts-area-area')
     const lines = container.querySelectorAll<SVGPathElement>('.recharts-line-curve')
 
-    expect(lines).toHaveLength(2)
+    // Median, mean, and the two band edges.
+    expect(lines).toHaveLength(4)
 
     /**
      * The band must be a closed shape traced out along the 90th percentile and

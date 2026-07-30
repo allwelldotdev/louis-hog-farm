@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { apiGet } from '@/lib/api/client'
-import type { DashboardKpis, HerdGrowth } from '@/lib/api/types'
+import type { DashboardKpis, Distribution, HerdGrowth, WeightDistribution } from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
 
 /**
@@ -26,5 +26,28 @@ export function useHerdGrowth() {
   return useQuery({
     queryKey: queryKeys.dashboard('herd-growth'),
     queryFn: () => apiGet<HerdGrowth>('/dashboard/herd-growth'),
+  })
+}
+
+/** Doubles as the breed facet: the filter's options come from this response
+ *  rather than a second endpoint that could fall out of step with the data. */
+export function useBreedDistribution() {
+  return useQuery({
+    queryKey: queryKeys.dashboard('breed-distribution'),
+    queryFn: () => apiGet<Distribution>('/dashboard/breed-distribution'),
+  })
+}
+
+export function useProductionClassDistribution() {
+  return useQuery({
+    queryKey: queryKeys.dashboard('production-class-distribution'),
+    queryFn: () => apiGet<Distribution>('/dashboard/production-class-distribution'),
+  })
+}
+
+export function useWeightDistribution() {
+  return useQuery({
+    queryKey: queryKeys.dashboard('weight-distribution'),
+    queryFn: () => apiGet<WeightDistribution>('/dashboard/weight-distribution'),
   })
 }

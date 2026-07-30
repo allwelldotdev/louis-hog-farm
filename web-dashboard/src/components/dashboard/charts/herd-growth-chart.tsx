@@ -35,6 +35,8 @@ export function HerdGrowthChart() {
   const data = points.map((point) => ({
     bucket: point.bucket,
     band: [point.p10_weight_kg, point.p90_weight_kg] as [number, number],
+    p10: point.p10_weight_kg,
+    p90: point.p90_weight_kg,
     median: point.median_weight_kg,
     average: point.avg_weight_kg,
     hogCount: point.hog_count,
@@ -61,11 +63,19 @@ export function HerdGrowthChart() {
             tickFormatter={(value: string) => formatBusinessDate(value)}
             minTickGap={24}
           />
+          {/* The unit belongs on the axis once, not repeated on every tick —
+              per-tick units wrap the label onto two lines and steal the width
+              the plot needs. */}
           <YAxis
             {...AXIS_PROPS}
-            width={44}
+            width={40}
             tickFormatter={(value: number) => formatNumber(value, 0)}
-            unit=" kg"
+            label={{
+              value: 'kg',
+              position: 'insideTopLeft',
+              fill: 'var(--color-muted)',
+              fontSize: 11,
+            }}
           />
           <Tooltip
             cursor={CURSOR_PROPS}
@@ -99,9 +109,23 @@ export function HerdGrowthChart() {
             dataKey="band"
             stroke="none"
             fill={CHART_COLORS[0]}
-            fillOpacity={0.16}
+            fillOpacity={0.12}
             isAnimationActive={false}
           />
+          {/* The band's own edges. Without them a wide spread reads as a solid
+              block of fill rather than as two percentiles with a gap between,
+              and the shape of the herd — which edge is moving — is lost. */}
+          {(['p90', 'p10'] as const).map((edge) => (
+            <Line
+              key={edge}
+              dataKey={edge}
+              stroke={CHART_COLORS[0]}
+              strokeOpacity={0.45}
+              strokeWidth={1}
+              dot={false}
+              isAnimationActive={false}
+            />
+          ))}
           <Line
             dataKey="average"
             stroke={CHART_COLORS[1]}
