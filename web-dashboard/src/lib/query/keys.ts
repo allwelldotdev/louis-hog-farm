@@ -16,4 +16,5 @@ export const queryKeys = {
     ['farm', 'dashboard', resource, params ?? {}] as const,
   list: (resource: string, params?: Record<string, unknown>) =>
     ['farm', 'list', resource, params ?? {}] as const,
+  detail: (resource: string, id: number) => ['farm', 'detail', resource, id] as const,
 }

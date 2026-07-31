@@ -2,6 +2,7 @@
 
 import type { ColumnDef } from '@tanstack/react-table'
 import { X } from 'lucide-react'
+import Link from 'next/link'
 import { useMemo } from 'react'
 
 import { DataTable } from '@/components/data-table'
@@ -69,7 +70,14 @@ export function HogsTable() {
         accessorKey: 'tag_number',
         header: 'Tag',
         enableHiding: false,
-        cell: (info) => <span className="figure text-ink">{info.getValue()}</span>,
+        cell: (info) => (
+          <Link
+            href={`/hogs/${info.row.original.id}`}
+            className="figure text-ink transition-colors hover:text-ochre"
+          >
+            {info.getValue()}
+          </Link>
+        ),
       },
       { id: 'breed', accessorKey: 'breed', header: 'Breed' },
       {

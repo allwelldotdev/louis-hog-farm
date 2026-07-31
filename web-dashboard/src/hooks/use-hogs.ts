@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { toQueryParams, useDashboardFilters } from '@/hooks/use-dashboard-filters'
 import { apiGet } from '@/lib/api/client'
-import type { Hog, Page } from '@/lib/api/types'
+import type { GrowthSeries, Hog, Page } from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
 
 /**
@@ -26,5 +26,22 @@ export function useHogs() {
   return useQuery({
     queryKey: queryKeys.list('hogs', query),
     queryFn: () => apiGet<Page<Hog>>('/hogs', query),
+  })
+}
+
+export function useHog(hogId: number) {
+  return useQuery({
+    queryKey: queryKeys.detail('hogs', hogId),
+    queryFn: () => apiGet<Hog>(`/hogs/${hogId}`),
+  })
+}
+
+/** One animal's weigh-ins over time — the only per-animal series the API has,
+ *  and what makes an individual's stall or decline visible at all. The herd
+ *  charts draw aggregates, which is precisely where those shapes disappear. */
+export function useHogGrowth(hogId: number) {
+  return useQuery({
+    queryKey: queryKeys.detail('hog-growth', hogId),
+    queryFn: () => apiGet<GrowthSeries>(`/hogs/${hogId}/growth`),
   })
 }

@@ -21,6 +21,7 @@ export type WeightDistribution = S['WeightDistributionResponse']
 export type FeedCostSeries = S['FeedCostSeriesResponse']
 export type AlertSummary = S['AlertSummaryResponse']
 export type Leaderboard = S['LeaderboardResponse']
+export type GrowthSeries = S['GrowthSeriesResponse']
 
 export type Hog = S['HogRead']
 export type HogStatus = S['HogStatus']
