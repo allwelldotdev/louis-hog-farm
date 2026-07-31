@@ -16,7 +16,7 @@ export
 endif
 
 .PHONY: help env-check install db-up db-down db-wait psql db-reset migrate migrate-down \
-        revision seed seed-bulk seed-reset api web up up-all down logs build ps lint fmt \
+        revision seed seed-bulk seed-reset delete-farm api web up up-all down logs build ps lint fmt \
         typecheck test check types build-web dev dev-stop clean
 
 TMUX_SESSION := hogfarm
@@ -87,6 +87,10 @@ seed-bulk: env-check ## Load a large backdated dataset: make seed-bulk FARMS=5 H
 
 seed-reset: env-check ## Re-seed, wiping each seeded farm's existing records first
 	cd $(BACKEND) && uv run python -m app.seed --profile demo --reset
+
+delete-farm: env-check ## Delete a farm and all its data: make delete-farm NAME="Acme Test Farm" (or ID=7)
+	cd $(BACKEND) && uv run python -m app.admin_tools.delete_farm \
+		$(if $(ID),--id $(ID),--name "$(NAME)")
 
 ## --------------------------------------------------------------- run ----
 
