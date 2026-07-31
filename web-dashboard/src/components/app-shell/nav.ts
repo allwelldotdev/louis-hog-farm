@@ -1,11 +1,12 @@
 import {
+  Baby,
+  Bell,
   HeartPulse,
   LayoutDashboard,
   PiggyBank,
   Skull,
   Syringe,
   Wheat,
-  Baby,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -48,5 +49,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/records/feed', label: 'Feed', icon: Wheat },
       { href: '/vaccinations', label: 'Vaccinations', icon: Syringe },
     ],
+  },
+  {
+    heading: 'Attention',
+    items: [{ href: '/alerts', label: 'Alerts', icon: Bell }],
   },
 ]
