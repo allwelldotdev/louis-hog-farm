@@ -1,25 +1,41 @@
 'use client'
 
 import { SignOutButton } from '@/components/app-shell/sign-out-button'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import { useFarm } from '@/hooks/use-farm'
+import { ROLE_LABELS } from '@/lib/auth/permissions'
+
+function Skeleton({ className }: { className: string }) {
+  return (
+    <span className={`inline-block animate-pulse rounded bg-raised align-middle ${className}`} />
+  )
+}
 
 export function Topbar() {
-  const { data: farm, isPending } = useFarm()
+  const { data: farm, isPending: farmPending } = useFarm()
+  const { data: user, isPending: userPending } = useCurrentUser()
 
   return (
     <header className="flex items-center justify-between gap-4 border-b border-rule px-6 py-3.5">
       <div className="min-w-0">
         <p className="eyebrow">Farm</p>
         <p className="truncate text-sm font-medium text-ink">
-          {isPending ? (
-            <span className="inline-block h-4 w-32 animate-pulse rounded bg-raised align-middle" />
-          ) : (
-            (farm?.name ?? 'Unavailable')
-          )}
+          {farmPending ? <Skeleton className="h-4 w-32" /> : (farm?.name ?? 'Unavailable')}
         </p>
       </div>
 
-      <SignOutButton />
+      <div className="flex items-center gap-4">
+        {/* The role is shown rather than merely enforced: a viewer who cannot
+            find the "Add hog" button should be able to see why. */}
+        <div className="hidden min-w-0 text-right sm:block">
+          <p className="eyebrow">{user ? ROLE_LABELS[user.role] : 'Signed in'}</p>
+          <p className="truncate text-sm font-medium text-ink">
+            {userPending ? <Skeleton className="h-4 w-24" /> : (user?.full_name ?? 'Unknown')}
+          </p>
+        </div>
+
+        <SignOutButton />
+      </div>
     </header>
   )
 }

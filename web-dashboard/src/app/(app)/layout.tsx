@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { DataVersionPoller } from '@/components/data-version-poller'
 import { Sidebar } from '@/components/app-shell/sidebar'
 import { Topbar } from '@/components/app-shell/topbar'
+import { Toaster } from '@/components/toaster'
 import { isSignedIn } from '@/lib/auth/session'
 import { QueryProvider } from '@/lib/query/provider'
 
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <main className="flex-1 px-6 py-6">{children}</main>
         </div>
       </div>
+      <Toaster />
     </QueryProvider>
   )
 }

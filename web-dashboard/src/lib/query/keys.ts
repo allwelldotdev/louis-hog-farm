@@ -10,6 +10,7 @@
 export const queryKeys = {
   root: ['farm'] as const,
   farm: () => ['farm', 'me'] as const,
+  currentUser: () => ['farm', 'user'] as const,
   dataVersion: () => ['farm', 'data-version'] as const,
   dashboard: (resource: string, params?: Record<string, unknown>) =>
     ['farm', 'dashboard', resource, params ?? {}] as const,
