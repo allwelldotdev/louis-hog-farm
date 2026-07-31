@@ -24,6 +24,7 @@ export type Leaderboard = S['LeaderboardResponse']
 
 export type Hog = S['HogRead']
 export type HogStatus = S['HogStatus']
+export type HogSex = S['HogSex']
 export type ProductionClass = S['ProductionClass']
 export type Alert = S['AlertRead']
 export type FeedRecord = S['FeedRecordRead']

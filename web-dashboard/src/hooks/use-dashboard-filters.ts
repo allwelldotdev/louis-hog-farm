@@ -19,6 +19,8 @@ export type DashboardFilters = {
   dateFrom?: string
   dateTo?: string
   breed?: string
+  status?: string
+  productionClass?: string
 }
 
 /** Snake_case in the URL to match the API's own parameter names — two spellings
@@ -27,6 +29,8 @@ const PARAM = {
   dateFrom: 'date_from',
   dateTo: 'date_to',
   breed: 'breed',
+  status: 'status',
+  productionClass: 'production_class',
 } as const
 
 export function useDashboardFilters() {
@@ -39,6 +43,8 @@ export function useDashboardFilters() {
       dateFrom: searchParams.get(PARAM.dateFrom) ?? undefined,
       dateTo: searchParams.get(PARAM.dateTo) ?? undefined,
       breed: searchParams.get(PARAM.breed) ?? undefined,
+      status: searchParams.get(PARAM.status) ?? undefined,
+      productionClass: searchParams.get(PARAM.productionClass) ?? undefined,
     }),
     [searchParams],
   )
@@ -63,7 +69,7 @@ export function useDashboardFilters() {
     [pathname, router, searchParams],
   )
 
-  const isFiltered = Boolean(filters.dateFrom || filters.dateTo || filters.breed)
+  const isFiltered = Object.values(filters).some(Boolean)
 
   return { filters, setFilters, isFiltered }
 }
@@ -73,12 +79,14 @@ export function useDashboardFilters() {
  *  declare would split its cache key for no reason. */
 export function toQueryParams(
   filters: DashboardFilters,
-  accepts: readonly ('date_from' | 'date_to' | 'breed')[],
+  accepts: readonly ('date_from' | 'date_to' | 'breed' | 'status' | 'production_class')[],
 ): Record<string, string | undefined> {
   const all = {
     date_from: filters.dateFrom,
     date_to: filters.dateTo,
     breed: filters.breed,
+    status: filters.status,
+    production_class: filters.productionClass,
   }
   return Object.fromEntries(accepts.map((key) => [key, all[key]]))
 }

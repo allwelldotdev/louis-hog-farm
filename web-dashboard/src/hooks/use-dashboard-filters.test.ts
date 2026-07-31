@@ -25,6 +25,14 @@ describe('toQueryParams', () => {
     })
   })
 
+  it('maps the hog facets to their API spelling', () => {
+    // `productionClass` is the only filter whose camelCase name differs from
+    // the API's, which makes it the one that can silently stop filtering.
+    expect(
+      toQueryParams({ status: 'archived', productionClass: 'sow' }, ['status', 'production_class']),
+    ).toEqual({ status: 'archived', production_class: 'sow' })
+  })
+
   it('uses the API spelling of each parameter', () => {
     expect(Object.keys(toQueryParams(filters, ['date_from', 'date_to', 'breed']))).toEqual([
       'date_from',
