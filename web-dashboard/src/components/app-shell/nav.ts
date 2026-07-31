@@ -1,9 +1,11 @@
 import {
   Baby,
   Bell,
+  Download,
   HeartPulse,
   LayoutDashboard,
   PiggyBank,
+  Settings,
   Skull,
   Syringe,
   Wheat,
@@ -53,5 +55,12 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     heading: 'Attention',
     items: [{ href: '/alerts', label: 'Alerts', icon: Bell }],
+  },
+  {
+    heading: 'Farm',
+    items: [
+      { href: '/exports', label: 'Exports', icon: Download },
+      { href: '/settings', label: 'Settings', icon: Settings },
+    ],
   },
 ]

@@ -273,12 +273,20 @@ export function HogDetail({ hogId }: { hogId: number }) {
 
       {/* Both forms open with this animal already chosen — the point of coming
           here to record something is that you already know which animal. */}
-      <HealthRecordForm
-        open={isHealthFormOpen}
-        onClose={() => setHealthFormOpen(false)}
-        hogId={hogId}
-      />
-      <FeedRecordForm open={isFeedFormOpen} onClose={() => setFeedFormOpen(false)} hogId={hogId} />
+      {canWrite ? (
+        <>
+          <HealthRecordForm
+            open={isHealthFormOpen}
+            onClose={() => setHealthFormOpen(false)}
+            hogId={hogId}
+          />
+          <FeedRecordForm
+            open={isFeedFormOpen}
+            onClose={() => setFeedFormOpen(false)}
+            hogId={hogId}
+          />
+        </>
+      ) : null}
     </div>
   )
 }

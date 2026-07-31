@@ -159,8 +159,12 @@ export function BreedingView() {
       // `GET /breeding-cycles` takes only `hog_id` — no date range to honour.
       showDateFilter={false}
     >
-      <OpenCycleForm open={isFormOpen} onClose={() => setFormOpen(false)} />
-      <CloseCycleForm cycle={closing} onClose={() => setClosing(null)} />
+      {canManage ? (
+        <>
+          <OpenCycleForm open={isFormOpen} onClose={() => setFormOpen(false)} />
+          <CloseCycleForm cycle={closing} onClose={() => setClosing(null)} />
+        </>
+      ) : null}
     </RecordsView>
   )
 }

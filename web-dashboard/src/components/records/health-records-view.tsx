@@ -93,7 +93,9 @@ export function HealthRecordsView() {
       getRowId={(record) => String(record.id)}
       emptyMessage="No health records in this window."
     >
-      <HealthRecordForm open={isFormOpen} onClose={() => setFormOpen(false)} />
+      {/* Not merely hidden for a viewer: an unreachable `<dialog>` in the DOM
+          still mounts its fields and its hog picker. */}
+      {canWrite ? <HealthRecordForm open={isFormOpen} onClose={() => setFormOpen(false)} /> : null}
     </RecordsView>
   )
 }

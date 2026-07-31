@@ -91,7 +91,7 @@ export function VaccinationsView() {
       // `GET /vaccinations` takes only `hog_id` — no date range to honour.
       showDateFilter={false}
     >
-      <VaccinationForm open={isFormOpen} onClose={() => setFormOpen(false)} />
+      {canWrite ? <VaccinationForm open={isFormOpen} onClose={() => setFormOpen(false)} /> : null}
     </RecordsView>
   )
 }

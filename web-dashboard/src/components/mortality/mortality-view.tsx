@@ -76,7 +76,7 @@ export function MortalityView() {
       // drew two deaths across five farms and none on this one.
       emptyMessage="No deaths recorded in this window."
     >
-      <MortalityForm open={isFormOpen} onClose={() => setFormOpen(false)} />
+      {canManage ? <MortalityForm open={isFormOpen} onClose={() => setFormOpen(false)} /> : null}
     </RecordsView>
   )
 }

@@ -90,7 +90,7 @@ export function FeedRecordsView() {
       getRowId={(record) => String(record.id)}
       emptyMessage={`No feed records in this window. Costs are in ${currency}.`}
     >
-      <FeedRecordForm open={isFormOpen} onClose={() => setFormOpen(false)} />
+      {canWrite ? <FeedRecordForm open={isFormOpen} onClose={() => setFormOpen(false)} /> : null}
     </RecordsView>
   )
 }
