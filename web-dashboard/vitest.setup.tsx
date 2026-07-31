@@ -58,7 +58,32 @@ class FixedSizeResizeObserver implements ResizeObserver {
   disconnect(): void {}
 }
 
+/**
+ * jsdom parses `<dialog>` but implements neither `showModal()` nor `close()`,
+ * so a component that drives the element imperatively throws on mount.
+ *
+ * Mapping them onto the `open` attribute is enough for the tests that matter
+ * here — is the form on screen, and can it be submitted. The top layer, the
+ * focus trap and the backdrop are the browser's job and are not asserted; those
+ * are exactly the parts worth taking from the platform rather than reimplementing.
+ */
+function stubDialog() {
+  const proto = globalThis.HTMLDialogElement?.prototype
+  if (!proto || typeof proto.showModal === 'function') return
+
+  proto.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true
+  }
+  proto.show = function show(this: HTMLDialogElement) {
+    this.open = true
+  }
+  proto.close = function close(this: HTMLDialogElement) {
+    this.open = false
+  }
+}
+
 beforeAll(() => {
+  stubDialog()
   globalThis.ResizeObserver = FixedSizeResizeObserver
 
   // Recharts also measures through the DOM directly; jsdom reports zero for

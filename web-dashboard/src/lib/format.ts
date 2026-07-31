@@ -28,6 +28,26 @@ export function parseBusinessDate(value: string): Date {
   return new Date(year, month - 1, day)
 }
 
+/**
+ * Today's calendar date at the farm, as `YYYY-MM-DD`.
+ *
+ * The backend rejects a `record_date` in the future using `farm_today(timezone)`,
+ * not UTC. A form that capped its date input at the browser's today would let a
+ * worker in Lagos submit a valid same-day entry at 23:30 and watch the API
+ * refuse it — the exact off-by-one the backend went to trouble to fix.
+ *
+ * `en-CA` is the shortest route to ISO order out of `Intl`; the locale is a
+ * formatting device here, not a user-facing choice.
+ */
+export function farmToday(timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
 export function formatBusinessDate(
   value: string,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' },

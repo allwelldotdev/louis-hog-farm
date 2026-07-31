@@ -1,15 +1,18 @@
 'use client'
 
 import type { ColumnDef } from '@tanstack/react-table'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import Link from 'next/link'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import { DataTable } from '@/components/data-table'
 import { StatusBadge } from '@/components/hogs/hog-badges'
 import { HogGrowthChart } from '@/components/hogs/hog-growth-chart'
+import { FeedRecordForm } from '@/components/records/feed-record-form'
+import { HealthRecordForm } from '@/components/records/health-record-form'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
+import { usePermissions } from '@/hooks/use-current-user'
 import { useFarm } from '@/hooks/use-farm'
 import { useHog } from '@/hooks/use-hogs'
 import { useFeedRecords, useHealthRecords } from '@/hooks/use-records'
@@ -52,6 +55,9 @@ export function HogDetail({ hogId }: { hogId: number }) {
   const hog = useHog(hogId)
   const health = useHealthRecords({ hogId })
   const feed = useFeedRecords({ hogId })
+  const { canWrite } = usePermissions()
+  const [isHealthFormOpen, setHealthFormOpen] = useState(false)
+  const [isFeedFormOpen, setFeedFormOpen] = useState(false)
   const currency = farm.data?.currency_code ?? 'NGN'
 
   const healthColumns = useMemo<ColumnDef<HealthRecord, never>[]>(
@@ -207,10 +213,18 @@ export function HogDetail({ hogId }: { hogId: number }) {
       <Card>
         <CardHeader>
           <h2 className="text-sm font-medium text-ink">Weigh-ins</h2>
-          <p className="text-xs text-muted">
-            {formatInteger(health.data?.total)} health{' '}
-            {health.data?.total === 1 ? 'record' : 'records'}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted">
+              {formatInteger(health.data?.total)} health{' '}
+              {health.data?.total === 1 ? 'record' : 'records'}
+            </p>
+            {canWrite ? (
+              <Button variant="outline" size="sm" onClick={() => setHealthFormOpen(true)}>
+                <Plus aria-hidden />
+                Add
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardBody>
           {health.isPending ? (
@@ -230,9 +244,17 @@ export function HogDetail({ hogId }: { hogId: number }) {
       <Card>
         <CardHeader>
           <h2 className="text-sm font-medium text-ink">Feed</h2>
-          <p className="text-xs text-muted">
-            {formatInteger(feed.data?.total)} feed {feed.data?.total === 1 ? 'record' : 'records'}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted">
+              {formatInteger(feed.data?.total)} feed {feed.data?.total === 1 ? 'record' : 'records'}
+            </p>
+            {canWrite ? (
+              <Button variant="outline" size="sm" onClick={() => setFeedFormOpen(true)}>
+                <Plus aria-hidden />
+                Add
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardBody>
           {feed.isPending ? (
@@ -248,6 +270,15 @@ export function HogDetail({ hogId }: { hogId: number }) {
           )}
         </CardBody>
       </Card>
+
+      {/* Both forms open with this animal already chosen — the point of coming
+          here to record something is that you already know which animal. */}
+      <HealthRecordForm
+        open={isHealthFormOpen}
+        onClose={() => setHealthFormOpen(false)}
+        hogId={hogId}
+      />
+      <FeedRecordForm open={isFeedFormOpen} onClose={() => setFeedFormOpen(false)} hogId={hogId} />
     </div>
   )
 }
