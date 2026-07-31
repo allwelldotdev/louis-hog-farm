@@ -17,7 +17,9 @@ endif
 
 .PHONY: help env-check install db-up db-down db-wait psql db-reset migrate migrate-down \
         revision seed seed-bulk seed-reset api web up up-all down logs build ps lint fmt \
-        typecheck test check types build-web clean
+        typecheck test check types build-web dev dev-stop clean
+
+TMUX_SESSION := hogfarm
 
 ## ---------------------------------------------------------------- help ----
 
@@ -111,6 +113,41 @@ logs: ## Follow container logs
 
 ps: ## Show container status
 	$(COMPOSE) ps
+
+## ---------------------------------------------------------- dev loop ----
+
+dev: env-check ## Boot the whole stack in tmux: db, migrations, API, dashboard, psql
+	@command -v tmux >/dev/null \
+		|| { echo "ERROR: tmux is not installed. Use 'make api' and 'make web' in two shells."; exit 1; }
+	@# Idempotent: a second `make dev` attaches to the running session rather
+	@# than stacking a second copy of every process on the same ports.
+	@if tmux has-session -t $(TMUX_SESSION) 2>/dev/null; then \
+		echo "session '$(TMUX_SESSION)' already running — attaching"; \
+		exec tmux attach -t $(TMUX_SESSION); \
+	fi
+	@# Database and schema first, in this shell. A pane that dies because the
+	@# migration had not finished scrolls away unread.
+	$(MAKE) db-up db-wait migrate
+	@tmux new-session  -d -s $(TMUX_SESSION) -n stack -c $(CURDIR)
+	@tmux send-keys    -t $(TMUX_SESSION):stack 'make api' C-m
+	@# `-l 40%`, not the older `-p 40`: tmux 3.x rejects `-p` here with a bare
+	@# "size missing" that points nowhere near the flag that caused it.
+	@tmux split-window -h -t $(TMUX_SESSION):stack -c $(CURDIR) -l 40%
+	@tmux send-keys    -t $(TMUX_SESSION):stack 'make web' C-m
+	@tmux split-window -v -t $(TMUX_SESSION):stack -c $(CURDIR)
+	@tmux send-keys    -t $(TMUX_SESSION):stack '$(COMPOSE) logs -f db' C-m
+	@tmux new-window   -t $(TMUX_SESSION) -n db -c $(CURDIR)
+	@tmux send-keys    -t $(TMUX_SESSION):db 'make psql' C-m
+	@tmux new-window   -t $(TMUX_SESSION) -n shell -c $(CURDIR)
+	@tmux select-window -t $(TMUX_SESSION):stack
+	@tmux select-pane  -t $(TMUX_SESSION):stack.0
+	@echo "API on :8000, dashboard on :3000 — 'make dev-stop' to tear down"
+	@exec tmux attach -t $(TMUX_SESSION)
+
+dev-stop: ## Kill the tmux session (the database container keeps running)
+	@tmux kill-session -t $(TMUX_SESSION) 2>/dev/null \
+		&& echo "session '$(TMUX_SESSION)' stopped" \
+		|| echo "no session '$(TMUX_SESSION)' running"
 
 ## ----------------------------------------------------------- quality ----
 

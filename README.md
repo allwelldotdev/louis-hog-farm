@@ -20,11 +20,16 @@ cp .env.example .env        # then set JWT_SECRET (openssl rand -hex 32)
 make install                # uv sync --all-groups + npm ci
 make db-up && make migrate  # Postgres in Docker, schema via Alembic
 make seed                   # demo farm: 1 boar, 2 sows, 3 growers, 14 piglets
-make api                    # http://localhost:8000  (/docs for the OpenAPI UI)
-make web                    # http://localhost:3000
+make dev                    # tmux: API on :8000, dashboard on :3000, database logs, psql
 ```
 
 Demo login: `manager@brightacres.com` / `Bright123!`
+
+`make dev` is the everyday loop. It brings the database up, applies migrations, then opens a tmux
+session with the API, the dashboard, `docker compose logs -f db`, a `psql` shell and a spare
+prompt. Running it again attaches to the existing session rather than starting a second copy of
+everything; `make dev-stop` tears it down and leaves the database container running. Without tmux,
+`make api` and `make web` are the same two processes in two shells.
 
 `DATABASE_URL` and `JWT_SECRET` are required and have no defaults — the API refuses to start
 without them, rather than booting misconfigured and reporting healthy.
@@ -33,6 +38,7 @@ Other useful targets:
 
 | Target | Does |
 |---|---|
+| `make dev` / `make dev-stop` | Start or stop the whole tmux dev session |
 | `make psql` | Opens `psql` inside the container — no host client needed |
 | `make seed-bulk` | 5 farms × 60 hogs × 90 days, ~27k feed rows, in about 12 seconds |
 | `make db-reset` | Destructive: drops the volume, re-migrates, re-seeds |
@@ -42,7 +48,7 @@ Other useful targets:
 ## Tests
 
 `make test` runs both suites: **pytest** for the backend (78 tests, against a `hogfarm_test`
-database on the same Postgres container) and **Vitest + jsdom** for the dashboard (15 tests).
+database on the same Postgres container) and **Vitest + jsdom** for the dashboard (25 tests).
 Backend tests skip rather than fail when Postgres is unreachable, so a stopped container does not
 look like a broken build.
 
