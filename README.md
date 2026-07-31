@@ -34,6 +34,18 @@ everything; `make dev-stop` tears it down and leaves the database container runn
 `DATABASE_URL` and `JWT_SECRET` are required and have no defaults — the API refuses to start
 without them, rather than booting misconfigured and reporting healthy.
 
+```mermaid
+flowchart LR
+    browser["Browser\nlocalhost:3000"] --> web
+    subgraph host["make dev (tmux session)"]
+        web["Next.js dev :3000"]
+        api["Uvicorn API :8000"]
+    end
+    web -->|"proxies via BFF\nhttpOnly cookies"| api
+    api --> db[("Postgres 15\n(Docker)")]
+    migrate["one-shot migrate\n(alembic upgrade head)"] --> db
+```
+
 Other useful targets:
 
 | Target | Does |
@@ -54,14 +66,8 @@ look like a broken build.
 
 ## Documentation
 
-All project documentation is under `.claude/docs/`:
-
 | File | Contents |
 |---|---|
-| `SPEC.md` | Architecture and technical specification |
-| `STATUS.md` | Current state and known issues |
-| `TREE.md` | Repository layout |
-| `plans/` | Numbered implementation plans |
-| `misc/` | Numbered reference documents (audits, findings) |
-
-Repository conventions and agent workflow rules are in `CLAUDE.md` and `.claude/policies/`.
+| [`docs/start_here.md`](docs/start_here.md) | From-zero provisioning guide — OS setup, prerequisites, install, seed, run |
+| [`docs/how_it_works_(non-technical).md`](docs/how_it_works_(non-technical).md) | What the app does, in plain language, with an FAQ |
+| [`docs/how_it_works_(technical).md`](docs/how_it_works_(technical).md) | Architecture, data model, and design decisions, with an FAQ |
