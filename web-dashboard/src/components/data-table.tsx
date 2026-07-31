@@ -145,7 +145,10 @@ export function DataTable<TData, TValue>({
             {table.getRowModel().rows.map((row) => (
               <tr key={row.id} className="border-b border-rule/60 last:border-0 hover:bg-raised/60">
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-2.5">
+                  // The container scrolls; cells do not wrap. A tag number or a
+                  // date broken across two lines is unreadable, and these
+                  // tables are mostly short values in many columns.
+                  <td key={cell.id} className="px-4 py-2.5 whitespace-nowrap">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

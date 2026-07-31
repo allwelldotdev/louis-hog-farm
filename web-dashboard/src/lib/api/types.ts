@@ -33,7 +33,13 @@ export type FeedRecordCreate = S['FeedRecordCreate']
 export type HealthRecord = S['HealthRecordRead']
 export type HealthRecordCreate = S['HealthRecordCreate']
 export type Vaccination = S['VaccinationRead']
+export type VaccinationCreate = S['VaccinationCreate']
 export type MortalityEvent = S['MortalityEventRead']
+export type MortalityEventCreate = S['MortalityEventCreate']
+export type BreedingCycle = S['BreedingCycleRead']
+export type BreedingCycleCreate = S['BreedingCycleCreate']
+export type BreedingCycleUpdate = S['BreedingCycleUpdate']
+export type BreedingStatus = S['BreedingStatus']
 
 /**
  * Every list endpoint answers with this envelope rather than a bare array.

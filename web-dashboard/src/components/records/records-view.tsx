@@ -56,6 +56,11 @@ type RecordsViewProps<TRecord> = {
   onRetry: () => void
   getRowId: (row: TRecord) => string
   emptyMessage: string
+  /** The date column to sort newest-first on; every one of these tables has one. */
+  initialSortId?: string
+  /** Off where the endpoint takes no date range — a filter that silently does
+   *  nothing is worse than no filter. */
+  showDateFilter?: boolean
   children: React.ReactNode
 }
 
@@ -74,6 +79,8 @@ export function RecordsView<TRecord>({
   onRetry,
   getRowId,
   emptyMessage,
+  initialSortId = 'record_date',
+  showDateFilter = true,
   children,
 }: RecordsViewProps<TRecord>) {
   const truncated = total !== undefined && total > rows.length
@@ -111,9 +118,9 @@ export function RecordsView<TRecord>({
             columns={columns}
             data={rows}
             getRowId={getRowId}
-            initialSort={[{ id: 'record_date', desc: true }]}
+            initialSort={[{ id: initialSortId, desc: true }]}
             emptyMessage={emptyMessage}
-            toolbar={<DateRangeFilter idPrefix={eyebrow.toLowerCase()} />}
+            toolbar={showDateFilter ? <DateRangeFilter idPrefix={title.toLowerCase()} /> : null}
           />
 
           {truncated ? (
