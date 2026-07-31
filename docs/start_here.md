@@ -97,6 +97,11 @@ Running `make dev` again just attaches to the existing session instead of starti
 
 Note: a `viewer@brightacres.com` / `Viewer123!` read-only account is mentioned elsewhere in this project's history, but it is **not created by the seed command** — a fresh provision only gets manager accounts unless you create a viewer user yourself.
 
+**Local testing helpers** (both need the db container up — `make db-up` if it isn't already):
+
+- `make farm-users ID=7` — looks up a farm's users and their emails/roles with a one-off query inside the db container, the same no-host-client pattern as `make psql`.
+- `make delete-farm NAME="Acme Test Farm"` (or `ID=7`) — deletes a farm and everything that references it (alerts, alert rules, vaccinations, mortality events, breeding cycles, feed records, health records, hogs, users), since only `data_versions` cascades at the DB level from `farms`. It prints row counts per table and asks for confirmation before deleting; the Makefile target itself doesn't expose a `--yes` skip-confirmation flag. Handy for throwing away a farm you created while testing without a full `make db-reset`.
+
 ## 7. If something goes wrong
 
 - **`tmux: command not found`** — run `make api` and `make web` in two separate terminals instead.

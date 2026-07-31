@@ -15,7 +15,7 @@ include .env
 export
 endif
 
-.PHONY: help env-check install db-up db-down db-wait psql db-reset migrate migrate-down \
+.PHONY: help env-check install db-up db-down db-wait psql farm-users db-reset migrate migrate-down \
         revision seed seed-bulk seed-reset delete-farm api web up up-all down logs build ps lint fmt \
         typecheck test check types build-web dev dev-stop clean
 
@@ -61,6 +61,11 @@ db-wait: ## Block until PostgreSQL accepts connections
 
 psql: ## Open a psql shell (runs inside the db container; no host client needed)
 	$(COMPOSE) exec db psql -U $(PG_USER) -d $(PG_DB)
+
+farm-users: ## List a farm's users and emails: make farm-users ID=7
+	@test -n "$(ID)" || { echo 'ERROR: pass a farm id, e.g. make farm-users ID=7'; exit 1; }
+	$(COMPOSE) exec db psql -U $(PG_USER) -d $(PG_DB) -c \
+		"SELECT u.email, u.full_name, u.role FROM users u JOIN farms f ON f.id = u.farm_id WHERE f.id = $(ID);"
 
 db-reset: ## DESTRUCTIVE — drop the volume, recreate, migrate and seed
 	$(COMPOSE) down -v
