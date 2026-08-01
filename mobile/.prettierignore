@@ -1,0 +1,4 @@
+node_modules
+.expo
+expo-env.d.ts
+src/lib/api/schema.d.ts
