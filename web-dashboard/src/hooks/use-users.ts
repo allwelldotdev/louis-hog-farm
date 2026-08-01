@@ -2,8 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query'
 
-import { apiGet } from '@/lib/api/client'
-import type { Page, UserRead } from '@/lib/api/types'
+import { useFarmMutation } from '@/hooks/use-farm-mutation'
+import { apiGet, apiSend } from '@/lib/api/client'
+import type { Page, UserCreateStaff, UserRead, UserRole } from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
 
 /**
@@ -19,4 +20,21 @@ export function useUsers(enabled: boolean) {
     queryFn: () => apiGet<Page<UserRead>>('/users', params),
     enabled,
   })
+}
+
+/** Manager-only. The API forces the new account onto the manager's own farm and
+ *  refuses any role but worker or viewer. */
+export function useCreateUser() {
+  return useFarmMutation((body: UserCreateStaff) => apiSend<UserRead>('POST', '/users', body))
+}
+
+/**
+ * Manager-only. The API refuses to change your own role or another manager's,
+ * because nothing in the app can promote anyone back to manager — the roster
+ * gates both cases so neither renders a control that can only answer 400/403.
+ */
+export function useUpdateUserRole() {
+  return useFarmMutation(({ id, role }: { id: number; role: UserRole }) =>
+    apiSend<UserRead>('PATCH', `/users/${id}`, { role }),
+  )
 }

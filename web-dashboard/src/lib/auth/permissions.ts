@@ -27,3 +27,25 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   worker: 'Worker',
   viewer: 'Viewer',
 }
+
+/**
+ * The roles a manager may hand out, mirroring `STAFF_ROLES` in
+ * `backend/app/schemas/user.py`. `manager` is excluded so a farm cannot grow a
+ * second administrator by accident, and `admin` is reachable by no code path.
+ */
+export const STAFF_ROLES = ['worker', 'viewer'] as const satisfies readonly UserRole[]
+
+/**
+ * Whether this account's role can be changed from the settings roster.
+ *
+ * Mirrors the two guards on `PATCH /users/{id}`: never your own role, and never
+ * a manager's or admin's. Both exist because nothing in the app can promote
+ * anyone *back* to manager, so a demotion would be a one-way door out of this
+ * very page.
+ */
+export function canChangeRoleOf(
+  target: { id: number; role: UserRole },
+  currentUserId: number | undefined,
+): boolean {
+  return target.id !== currentUserId && !canManage(target.role)
+}

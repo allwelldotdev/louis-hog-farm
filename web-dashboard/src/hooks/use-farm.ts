@@ -2,8 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query'
 
-import { apiGet } from '@/lib/api/client'
-import type { DataVersion, FarmSummary } from '@/lib/api/types'
+import { useFarmMutation } from '@/hooks/use-farm-mutation'
+import { apiGet, apiSend } from '@/lib/api/client'
+import type { DataVersion, FarmSummary, FarmUpdate } from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
 
 /** The signed-in user's farm — supplies the currency and timezone every other
@@ -13,6 +14,12 @@ export function useFarm() {
     queryKey: queryKeys.farm(),
     queryFn: () => apiGet<FarmSummary>('/farms/me'),
   })
+}
+
+/** Manager-only, and the name is all the API will change: currency and timezone
+ *  are per-deployment, and feed records store the currency at write time. */
+export function useUpdateFarm() {
+  return useFarmMutation((body: FarmUpdate) => apiSend<FarmSummary>('PATCH', '/farms/me', body))
 }
 
 /**
