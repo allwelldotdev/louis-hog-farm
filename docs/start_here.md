@@ -40,8 +40,9 @@ then continue with step 3.
 | `make` | drives every workflow in this repo | `make --version` |
 | `tmux` | the standard way `make dev` runs the stack | `tmux -V` (if truly unavailable, `make api` and `make web` in two separate shells is the fallback) |
 | `uv` | manages the backend's Python 3.12 environment | `uv --version` — check at install time whether your platform needs Python 3.12 preinstalled or whether `uv` fetches it for you |
-| Node.js via [nvm](https://github.com/nvm-sh/nvm) | runs the dashboard dev server | `cd web-dashboard && nvm install` (picks up the pinned version from `.nvmrc`, currently `25.7`) |
+| Node.js via [nvm](https://github.com/nvm-sh/nvm) | runs the dashboard and mobile dev servers | `cd web-dashboard && nvm install` (picks up the pinned version from `.nvmrc`, currently `25.7`; `mobile/.nvmrc` pins the same `25.7`) |
 | npm | comes bundled with Node | `npm --version` |
+| Expo Go (optional) | try the mobile app on a real Android phone | install from the Play Store; the phone must be on the **same wifi network** as this machine |
 
 Not needed: a host `psql` client (`make psql` runs it inside the container) or a standalone Python
 install.
@@ -64,10 +65,21 @@ No `openssl`? Any random string of 32+ characters works. `DATABASE_URL` in `.env
 points at the local Docker Postgres service — leave it as-is unless port 5432 is taken on your
 machine.
 
+If you plan to try the mobile app, also copy its env file — note it lives **inside `mobile/`**,
+not the repo root, because that is where Expo reads `.env` from:
+
+```bash
+cp mobile/.env.example mobile/.env
+```
+
+It holds a single variable, `EXPO_PUBLIC_API_URL`. Left blank it is fine for a normal Expo Go
+session (the app falls back to whatever host served the Metro bundle); see step 7 for when you
+need to set it explicitly.
+
 ## 5. Install, provision the database, migrate
 
 ```bash
-make install                # uv sync --all-groups + npm ci
+make install                # uv sync --all-groups + npm ci (web-dashboard and mobile)
 make db-up && make migrate  # Postgres in Docker, schema via Alembic
 ```
 
@@ -94,8 +106,9 @@ make dev
 ```
 
 Boots the database, waits for it, applies migrations, then opens a tmux session named `hogfarm`:
-- **`stack` window** — API pane (`make api`, autoreload, `:8000`), dashboard pane (`make web`,
-  `:3000`), and a pane following `docker compose logs -f db`.
+- **`stack` window** — API pane (`make api`, autoreload, `:8000`, bound to `0.0.0.0` so a phone on
+  the LAN can reach it), dashboard pane (`make web`, `:3000`), and a pane following
+  `docker compose logs -f db`.
 - **`db` window** — a `psql` shell into the database.
 - **`shell` window** — a spare empty prompt.
 
@@ -129,6 +142,32 @@ manager accounts unless you create a viewer user yourself.
   target itself doesn't expose a `--yes` skip-confirmation flag. Handy for throwing away a farm
   you created while testing without a full `make db-reset`.
 
+### Mobile app (optional)
+
+The mobile app has been built but has **not yet been run on a real phone** — if you try it, you are
+genuinely the first person to do so, and should expect some first-run friction.
+
+```bash
+make mobile                  # cd mobile && npx expo start — Metro on :8081
+```
+
+This is deliberately **not** part of `make dev`'s tmux session: Metro wants its own terminal for
+the `r` / `j` keypresses, and `make dev`'s port guard only checks 8000/3000, so folding 8081 in
+there would make `make dev` refuse to start whenever a healthy Metro is already running elsewhere.
+
+To run it on a phone:
+1. Install **Expo Go** on the phone and make sure it's on **the same wifi** as this machine.
+2. Run `make mobile` and scan the QR code from Expo Go.
+3. The app needs to reach the FastAPI backend directly (unlike the dashboard, there is no
+   server-side proxy). Find this machine's LAN address with `hostname -I`, and if the app can't
+   auto-detect it, set `EXPO_PUBLIC_API_URL=http://<lan-ip>:8000` in `mobile/.env` (restart Metro
+   after editing it) — or set the server address directly on the phone from the sign-in screen or
+   Settings. **Never use `localhost`** here; on the phone that means the phone itself.
+
+A fresh clone that runs `make typecheck` before ever starting Metro once can show errors from a
+missing generated `mobile/expo-env.d.ts` file — running `make mobile` once generates it and the
+errors go away.
+
 ## 8. If something goes wrong
 
 - **`tmux: command not found`** — run `make api` and `make web` in two separate terminals instead.
@@ -139,6 +178,12 @@ manager accounts unless you create a viewer user yourself.
 - **`.env` errors from `make dev`/`make migrate`** — `make env-check` requires `JWT_SECRET` to be
   32+ characters and `DATABASE_URL` to start with `postgresql`; the error message names exactly
   which one failed.
+- **Phone can't reach the API** — first check `http://<lan-ip>:8000/health` in the *phone's own
+  browser*; if that fails nothing in the app can work either. Usual causes: a host firewall
+  (`sudo ufw allow 8000` on Linux), the phone and computer being on different networks (mobile
+  data instead of wifi, or a guest wifi network), or router AP-isolation between devices.
+- **`make typecheck` fails in `mobile/` on a fresh clone** — run `make mobile` once to generate
+  `mobile/expo-env.d.ts`, then retry.
 
 ## Where next
 
