@@ -27,9 +27,11 @@ class Farm(Base):
     )
     # IANA zone. "Today" must be evaluated in the farm's local time: for a farm
     # at UTC+1, a same-day entry made after 23:00 local is otherwise rejected as
-    # being in the future.
+    # being in the future. Africa/Lagos is the default because the system is
+    # built for Nigerian pig farms first — it is also what the seeder has always
+    # used, so registration now agrees with it instead of falling back to UTC.
     timezone: Mapped[str] = mapped_column(
-        String(64), nullable=False, server_default="UTC", default="UTC"
+        String(64), nullable=False, server_default="Africa/Lagos", default="Africa/Lagos"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

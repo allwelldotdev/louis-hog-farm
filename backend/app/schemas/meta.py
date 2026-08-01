@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DataVersionResponse(BaseModel):
@@ -24,3 +24,15 @@ class FarmSummary(BaseModel):
     currency_code: str
     hog_count: int
     created_at: datetime
+
+
+class FarmUpdate(BaseModel):
+    """The name, and only the name.
+
+    Currency and timezone stay server-owned. Feed records store `currency_code`
+    at write time for historical accuracy, so changing a farm's currency would
+    leave the money charts summing two units; the timezone is set per deployment
+    and moving it silently reinterprets what "today" meant for existing records.
+    """
+
+    name: str = Field(min_length=1, max_length=255)

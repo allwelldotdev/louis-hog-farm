@@ -418,7 +418,8 @@ class TestMetaAndFarm:
         body = client.get(f"{API}/farms/me", headers=registered["headers"]).json()
         assert body["name"] == "Test Farm"
         assert body["currency_code"] == "NGN"
-        assert body["timezone"] == "UTC"
+        # Nigeria-first: registration now agrees with the seeder instead of UTC.
+        assert body["timezone"] == "Africa/Lagos"
         assert body["hog_count"] == 1
 
 
@@ -734,6 +735,128 @@ class TestUsers:
             data={"username": "worker@example.com", "password": "Password123"},
         ).json()["access_token"]
         r = client.get(f"{API}/users", headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 403
+
+    def test_a_managers_own_role_cannot_be_changed(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """Nothing in the app can promote to manager, so self-demotion is a
+        one-way door out of the settings page."""
+        me = client.get(f"{API}/users/me", headers=registered["headers"]).json()
+        r = client.patch(
+            f"{API}/users/{me['id']}",
+            json={"role": "viewer"},
+            headers=registered["headers"],
+        )
+        assert r.status_code == 400
+
+    def test_a_staff_role_can_be_changed(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        created = client.post(
+            f"{API}/users",
+            json={
+                "email": "staff@example.com",
+                "password": "Password123",
+                "full_name": "S",
+                "role": "viewer",
+            },
+            headers=registered["headers"],
+        ).json()
+        r = client.patch(
+            f"{API}/users/{created['id']}",
+            json={"role": "worker"},
+            headers=registered["headers"],
+        )
+        assert r.status_code == 200
+        assert r.json()["role"] == "worker"
+
+    def test_a_role_cannot_be_raised_to_manager(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        created = client.post(
+            f"{API}/users",
+            json={
+                "email": "staff2@example.com",
+                "password": "Password123",
+                "full_name": "S",
+                "role": "viewer",
+            },
+            headers=registered["headers"],
+        ).json()
+        r = client.patch(
+            f"{API}/users/{created['id']}",
+            json={"role": "manager"},
+            headers=registered["headers"],
+        )
+        assert r.status_code == 422
+
+    def test_a_user_on_another_farm_is_not_reachable(self, client: TestClient) -> None:
+        auths = []
+        for tag in ("r", "s"):
+            client.post(
+                f"{API}/auth/register",
+                json={
+                    "email": f"{tag}@example.com",
+                    "password": "Password123",
+                    "full_name": tag,
+                    "farm_name": f"Farm {tag}",
+                },
+            )
+            tok = client.post(
+                f"{API}/auth/login",
+                data={"username": f"{tag}@example.com", "password": "Password123"},
+            ).json()["access_token"]
+            auths.append({"Authorization": f"Bearer {tok}"})
+        foreign = client.post(
+            f"{API}/users",
+            json={
+                "email": "foreign-staff@example.com",
+                "password": "Password123",
+                "full_name": "F",
+                "role": "viewer",
+            },
+            headers=auths[0],
+        ).json()
+        r = client.patch(f"{API}/users/{foreign['id']}", json={"role": "worker"}, headers=auths[1])
+        assert r.status_code == 404
+
+
+class TestFarms:
+    def test_a_manager_can_rename_the_farm(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        r = client.patch(
+            f"{API}/farms/me", json={"name": "Renamed Farm"}, headers=registered["headers"]
+        )
+        assert r.status_code == 200
+        assert r.json()["name"] == "Renamed Farm"
+        assert client.get(f"{API}/farms/me", headers=registered["headers"]).json()["name"] == (
+            "Renamed Farm"
+        )
+
+    def test_a_worker_cannot_rename_the_farm(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        client.post(
+            f"{API}/users",
+            json={
+                "email": "farmworker@example.com",
+                "password": "Password123",
+                "full_name": "W",
+                "role": "worker",
+            },
+            headers=registered["headers"],
+        )
+        tok = client.post(
+            f"{API}/auth/login",
+            data={"username": "farmworker@example.com", "password": "Password123"},
+        ).json()["access_token"]
+        r = client.patch(
+            f"{API}/farms/me",
+            json={"name": "Nope"},
+            headers={"Authorization": f"Bearer {tok}"},
+        )
         assert r.status_code == 403
 
 

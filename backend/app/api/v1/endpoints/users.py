@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentUser, ManagerUser
+from app.api.access import get_user_in_farm
+from app.api.deps import CurrentUser, ManagerUser, is_manager_like
 from app.api.pagination import PageParams, paginate
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.pagination import Page
-from app.schemas.user import UserCreateStaff, UserRead
+from app.schemas.user import UserCreateStaff, UserRead, UserRoleUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -56,3 +57,36 @@ def create_staff_user(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.patch("/{user_id}", response_model=UserRead)
+def update_staff_role(
+    db: Annotated[Session, Depends(get_db)],
+    manager: ManagerUser,
+    user_id: int,
+    body: UserRoleUpdate,
+) -> User:
+    """Move a colleague between worker and viewer. Manager-only, farm-scoped.
+
+    Two guards, both about not being able to lock a farm out of its own
+    settings. Nothing in this application can promote anyone to manager — not
+    registration, which always creates a new farm, and not `POST /users`, whose
+    schema refuses the role. So a manager who could demote themselves, or each
+    other, would leave the farm with no one able to administer it and no way
+    back short of editing the database.
+    """
+    target = get_user_in_farm(db, user_id, manager.farm_id)
+    if target.id == manager.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot change your own role"
+        )
+    if is_manager_like(target):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A manager's role cannot be changed from the app",
+        )
+    target.role = body.role
+    db.add(target)
+    db.commit()
+    db.refresh(target)
+    return target
