@@ -183,6 +183,86 @@ class TestHogs:
         )
         assert r.status_code == 404
 
+    def test_lineage_can_be_cleared(self, client: TestClient, registered: dict[str, Any]) -> None:
+        """An explicit null clears; an absent key leaves the value alone.
+
+        `if body.dam_id is not None` could not tell the two apart, so a dam
+        recorded against the wrong animal was permanent.
+        """
+        dam = _make_hog(
+            client, registered, tag_number="LIN-DAM", birth_date="2024-01-01", sex="female"
+        )
+        piglet = _make_hog(
+            client, registered, tag_number="LIN-1", birth_date="2025-06-01", dam_id=dam["id"]
+        )
+        assert piglet["dam_id"] == dam["id"]
+
+        untouched = client.patch(
+            f"{API}/hogs/{piglet['id']}",
+            json={"breed": "Landrace"},
+            headers=registered["headers"],
+        ).json()
+        assert untouched["dam_id"] == dam["id"]
+
+        cleared = client.patch(
+            f"{API}/hogs/{piglet['id']}",
+            json={"dam_id": None},
+            headers=registered["headers"],
+        )
+        assert cleared.status_code == 200
+        assert cleared.json()["dam_id"] is None
+
+    def test_a_dam_must_be_female(self, client: TestClient, registered: dict[str, Any]) -> None:
+        boar = _make_hog(
+            client,
+            registered,
+            tag_number="LIN-BOAR",
+            birth_date="2024-01-01",
+            sex="male",
+            production_class="boar",
+        )
+        r = client.post(
+            f"{API}/hogs",
+            json={
+                "tag_number": "LIN-2",
+                "birth_date": "2025-06-01",
+                "breed": "Duroc",
+                "dam_id": boar["id"],
+            },
+            headers=registered["headers"],
+        )
+        assert r.status_code == 400
+        assert "female" in r.json()["detail"]
+
+    def test_a_hog_cannot_be_its_own_sire(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        hog = _make_hog(client, registered, tag_number="LIN-3", sex="male")
+        r = client.patch(
+            f"{API}/hogs/{hog['id']}",
+            json={"sire_id": hog["id"]},
+            headers=registered["headers"],
+        )
+        assert r.status_code == 400
+
+    def test_a_parent_must_be_born_first(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        younger = _make_hog(
+            client, registered, tag_number="LIN-YOUNG", birth_date="2026-01-01", sex="female"
+        )
+        r = client.post(
+            f"{API}/hogs",
+            json={
+                "tag_number": "LIN-4",
+                "birth_date": "2025-06-01",
+                "breed": "Duroc",
+                "dam_id": younger["id"],
+            },
+            headers=registered["headers"],
+        )
+        assert r.status_code == 400
+
     def test_another_farms_hog_is_not_visible(self, client: TestClient) -> None:
         """404 rather than 403 — a 403 would confirm the row exists."""
         farms = []

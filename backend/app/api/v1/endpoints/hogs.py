@@ -10,7 +10,7 @@ from app.api.deps import CurrentUser, MutatorUser, is_manager_like
 from app.api.pagination import PageParams, paginate
 from app.core.time import utc_now
 from app.db.session import get_db
-from app.models.hog import Hog, HogStatus, ProductionClass
+from app.models.hog import Hog, HogSex, HogStatus, ProductionClass
 from app.models.user import UserRole
 from app.schemas.dashboard import GrowthPoint, GrowthSeriesResponse
 from app.schemas.hog import HogCreate, HogRead, HogUpdate
@@ -52,14 +52,45 @@ def list_hogs(
     return paginate(db, stmt, page, HogRead)
 
 
-def _assert_parents_in_farm(
-    db: Session, farm_id: int, dam_id: int | None, sire_id: int | None
+def _validate_lineage(
+    db: Session,
+    farm_id: int,
+    dam_id: int | None,
+    sire_id: int | None,
+    birth_date: date,
+    child_id: int | None = None,
 ) -> None:
-    # Lineage ids come from the client, so they are checked rather than trusted:
-    # an unchecked dam_id is a hog id from another farm waiting to be linked.
-    for parent_id in (dam_id, sire_id):
-        if parent_id is not None:
-            get_hog_in_farm(db, parent_id, farm_id)
+    """Check lineage ids before they are stored.
+
+    Ids come from the client, so each is resolved rather than trusted: an
+    unchecked dam_id is a hog id from another farm waiting to be linked. Beyond
+    ownership, three rules keep a pedigree coherent — a dam is female, a sire is
+    male, and no animal is its own parent or younger than one. The database
+    cannot enforce any of them: dam_id and sire_id are plain self-FKs, not
+    composite with farm_id, so this is the only place they are checked.
+    """
+    for parent_id, expected_sex, role in (
+        (dam_id, HogSex.female, "dam"),
+        (sire_id, HogSex.male, "sire"),
+    ):
+        if parent_id is None:
+            continue
+        if parent_id == child_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"A hog cannot be its own {role}",
+            )
+        parent = get_hog_in_farm(db, parent_id, farm_id)
+        if parent.sex is not expected_sex:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The {role} must be a {expected_sex.value} hog",
+            )
+        if parent.birth_date >= birth_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The {role} must be born before the hog itself",
+            )
 
 
 @router.post("", response_model=HogRead, status_code=status.HTTP_201_CREATED)
@@ -73,7 +104,7 @@ def create_hog(
             status_code=status.HTTP_409_CONFLICT,
             detail="An active hog with this tag number already exists on the farm",
         )
-    _assert_parents_in_farm(db, user.farm_id, body.dam_id, body.sire_id)
+    _validate_lineage(db, user.farm_id, body.dam_id, body.sire_id, body.birth_date)
     hog = Hog(
         farm_id=user.farm_id,
         tag_number=body.tag_number,
@@ -147,7 +178,15 @@ def update_hog(
             status_code=status.HTTP_409_CONFLICT,
             detail="An active hog with this tag number already exists on the farm",
         )
-    _assert_parents_in_farm(db, user.farm_id, body.dam_id, body.sire_id)
+    # Lineage is the one pair of fields that has to distinguish "leave it alone"
+    # from "clear it" — a dam recorded in error is corrected by removing her, and
+    # `is not None` cannot express that. `model_fields_set` can: it holds the keys
+    # the client actually sent, so an explicit null clears and an absent key does
+    # not. The other fields have no meaningful null and stay as they are.
+    new_dam_id = body.dam_id if "dam_id" in body.model_fields_set else hog.dam_id
+    new_sire_id = body.sire_id if "sire_id" in body.model_fields_set else hog.sire_id
+    new_birth_date = body.birth_date if body.birth_date is not None else hog.birth_date
+    _validate_lineage(db, user.farm_id, new_dam_id, new_sire_id, new_birth_date, child_id=hog.id)
     if body.tag_number is not None:
         hog.tag_number = body.tag_number
     if body.birth_date is not None:
@@ -160,10 +199,8 @@ def update_hog(
         hog.sex = body.sex
     if body.production_class is not None:
         hog.production_class = body.production_class
-    if body.dam_id is not None:
-        hog.dam_id = body.dam_id
-    if body.sire_id is not None:
-        hog.sire_id = body.sire_id
+    hog.dam_id = new_dam_id
+    hog.sire_id = new_sire_id
     hog.updated_by_user_id = user.id
     hog.updated_at = utc_now()
     db.add(hog)
