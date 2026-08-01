@@ -7,21 +7,26 @@ import {
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import { loadBaseUrl } from '@/api-runtime'
+import { QueryProvider } from '@/components/providers'
 import { ThemeProvider, useTheme } from '@/theme/theme-provider'
 
-// Held until fonts *and* the stored theme have resolved. One gate rather than
-// two means no flash of the wrong palette and no text reflow when Archivo
-// swaps in — the RN analogue of the dashboard's inline <head> theme script.
+// Held until fonts, the stored theme *and* the server address have resolved.
+// One gate rather than three means no flash of the wrong palette, no text
+// reflow when Archivo swaps in, and no request firing before it knows where to
+// go — the RN analogue of the dashboard's inline <head> theme script.
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AppShell />
+        <QueryProvider>
+          <AppShell />
+        </QueryProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   )
@@ -29,19 +34,28 @@ export default function RootLayout() {
 
 function AppShell() {
   const { colors, resolved, isReady: themeReady } = useTheme()
+  const [baseReady, setBaseReady] = useState(false)
 
   // Exactly the three weights the type scale names. Android will not
-  // synthesise a weight against a custom family, so each one has to be a real
-  // face — see src/theme/type.ts.
+  // synthesise a weight against a custom family, so each has to be a real face
+  // — see src/theme/type.ts.
   const [fontsReady, fontError] = useFonts({
     Archivo_400Regular,
     Archivo_500Medium,
     Archivo_600SemiBold,
   })
 
+  useEffect(() => {
+    loadBaseUrl()
+      // A missing address is a state the sign-in screen explains and offers to
+      // fix, not a reason to fail to boot.
+      .catch(() => {})
+      .finally(() => setBaseReady(true))
+  }, [])
+
   // A font that fails to load is not worth a blank screen: RN falls back to
-  // the system face and the app is still entirely usable.
-  const ready = themeReady && (fontsReady || fontError !== null)
+  // the system face and the app stays entirely usable.
+  const ready = themeReady && baseReady && (fontsReady || fontError !== null)
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {})

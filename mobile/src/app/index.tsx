@@ -1,156 +1,180 @@
-import { Scale, Syringe } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
+import { api, getBaseUrl } from '@/api-runtime'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
-import { Banner, EmptyState, Skeleton } from '@/components/ui/feedback'
+import { Banner } from '@/components/ui/feedback'
 import { Field, Input } from '@/components/ui/field'
-import { Locked, LockedNotice } from '@/components/ui/locked'
-import { Pill } from '@/components/ui/pill'
+import { Pill, roleTone } from '@/components/ui/pill'
 import { Screen, ScreenHeader } from '@/components/ui/screen'
-import { SegmentedChips } from '@/components/ui/segmented-chips'
+import { errorMessage } from '@/lib/api/errors'
+import { ROLE_LABELS } from '@/lib/auth/permissions'
+import { formatInteger, formatNumber } from '@/lib/format'
+import { useCurrentUser, useFarm, useKpis } from '@/hooks/use-farm'
 import { useTheme } from '@/theme/theme-provider'
 import { space } from '@/theme/tokens'
-import { THEME_LABELS, type ThemePreference } from '@/theme/preference'
 import { eyebrow, figure, figureSize, text } from '@/theme/type'
 
 /**
- * Design-system showcase — temporary, replaced by the boot route in P3.
+ * Temporary connectivity check — replaced by the boot route in P3.
  *
- * It exists so P1 can be verified on a real device rather than asserted: one
- * of every primitive, in both palettes, at real sizes.
+ * Exists so the data layer is *proven* against the seeded database from a real
+ * device rather than asserted from unit tests: sign in, then read `/users/me`,
+ * `/farms/me` and `/dashboard/kpis` through the same client, cache and bearer
+ * path every screen will use.
  */
-export default function Showcase() {
-  const { colors, preference, setTheme } = useTheme()
-  const [weight, setWeight] = useState('')
-  const [sex, setSex] = useState<'male' | 'female' | undefined>('female')
+export default function ConnectivityCheck() {
+  const { colors } = useTheme()
+  const [email, setEmail] = useState('manager@brightacres.com')
+  const [password, setPassword] = useState('')
+  const [signedIn, setSignedIn] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function signIn() {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.login(email.trim(), password)
+      setSignedIn(true)
+    } catch (cause) {
+      setError(errorMessage(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function signOut() {
+    await api.signOut()
+    setSignedIn(false)
+  }
 
   return (
     <Screen>
-      <ScreenHeader section="Design system" title="Bright Acres" />
+      <ScreenHeader section="P2 check" title="Data layer" />
 
       <Card>
-        <CardHeader title="Theme" hint="System is stored as the absence of a key" />
+        <CardHeader title="Server" hint="Resolved at boot" />
         <CardBody>
-          <SegmentedChips
-            options={(['system', 'light', 'dark'] as ThemePreference[]).map((value) => ({
-              value,
-              label: THEME_LABELS[value],
-            }))}
-            value={preference}
-            onChange={(value) => setTheme(value ?? 'system')}
-          />
+          <Text style={[text.body, { color: colors.ink }]}>{getBaseUrl() ?? 'not configured'}</Text>
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader title="Figures" hint="Tabular, semibold, tightened" />
-        <CardBody>
-          <View style={styles.row}>
-            <Metric label="Active hogs" value="61" tone={colors.ink} />
-            <Metric label="Avg daily gain" value="0.42" tone={colors.gain} />
-            <Metric label="Open alerts" value="2" tone={colors.alert} />
-          </View>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Inputs" />
-        <CardBody>
-          <View style={styles.stack}>
-            <Field label="Weight" suffix="kg" hint="Recorded against today's date">
-              <Input
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="decimal-pad"
-                placeholder="0.0"
-              />
-            </Field>
-            <Field label="Sex">
-              <SegmentedChips
-                options={[
-                  { value: 'female' as const, label: 'Female' },
-                  { value: 'male' as const, label: 'Male' },
-                ]}
-                value={sex}
-                onChange={setSex}
-              />
-            </Field>
-          </View>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Buttons and pills" />
-        <CardBody>
-          <View style={styles.stack}>
-            <Button
-              label="Save weigh-in"
-              size="lg"
-              fullWidth
-              icon={<Scale size={18} color={colors.onAccent} />}
-            />
-            <View style={styles.row}>
-              <Button label="Cancel" variant="outline" />
+      {signedIn ? (
+        <>
+          <SessionCards />
+          <Button label="Sign out" variant="outline" onPress={signOut} />
+        </>
+      ) : (
+        <Card>
+          <CardHeader title="Sign in" />
+          <CardBody>
+            <View style={styles.stack}>
+              {error ? <Banner tone="alert" message={error} /> : null}
+              <Field label="Email">
+                <Input
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </Field>
+              <Field label="Password">
+                <Input value={password} onChangeText={setPassword} secureTextEntry />
+              </Field>
               <Button
-                label="Vaccinate"
-                variant="ghost"
-                icon={<Syringe size={18} color={colors.muted} />}
+                label={error ? 'Try again' : 'Sign in'}
+                size="lg"
+                fullWidth
+                loading={busy}
+                onPress={signIn}
               />
             </View>
-            <Button label="Record a death" variant="danger" />
-            <View style={styles.pills}>
-              <Pill label="Active" tone="gain" />
-              <Pill label="Archived" tone="neutral" />
-              <Pill label="Deceased" tone="alert" />
-              <Pill label="Acknowledged" tone="ochre" />
-            </View>
-          </View>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="States" />
-        <CardBody>
-          <View style={styles.stack}>
-            <Banner tone="alert" message="Could not save. Check the connection and try again." />
-            <Skeleton height={48} />
-            <EmptyState message="This animal has never been weighed." />
-          </View>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Present-but-locked" hint="The divergence from the dashboard" />
-        <CardBody>
-          <View style={styles.stack}>
-            <Locked when role="manager" can="view mortality records but not add them">
-              <Button label="Record a death" variant="outline" fullWidth />
-            </Locked>
-            <LockedNotice role="manager" can="staff accounts are managed by your farm's manager" />
-          </View>
-        </CardBody>
-      </Card>
+          </CardBody>
+        </Card>
+      )}
     </Screen>
   )
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone: string }) {
+function SessionCards() {
+  const { colors } = useTheme()
+  const user = useCurrentUser()
+  const farm = useFarm()
+  const kpis = useKpis()
+
+  return (
+    <>
+      <Card>
+        <CardHeader title="GET /users/me" />
+        <CardBody>
+          {user.isPending ? (
+            <Text style={[text.meta, { color: colors.muted }]}>Loading…</Text>
+          ) : user.error ? (
+            <Banner tone="alert" message={errorMessage(user.error)} />
+          ) : user.data ? (
+            <View style={styles.stack}>
+              <Text style={[text.bodyMedium, { color: colors.ink }]}>{user.data.full_name}</Text>
+              <Text style={[text.meta, { color: colors.muted }]}>{user.data.email}</Text>
+              <Pill label={ROLE_LABELS[user.data.role]} tone={roleTone(user.data.role)} />
+            </View>
+          ) : null}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="GET /farms/me" />
+        <CardBody>
+          {farm.data ? (
+            <View style={styles.stack}>
+              <Text style={[text.bodyMedium, { color: colors.ink }]}>{farm.data.name}</Text>
+              <Text style={[text.meta, { color: colors.muted }]}>
+                {farm.data.hog_count} active · {farm.data.currency_code} · {farm.data.timezone}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[text.meta, { color: colors.muted }]}>
+              {farm.error ? errorMessage(farm.error) : 'Loading…'}
+            </Text>
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="GET /dashboard/kpis" hint="Also the source of farm-today" />
+        <CardBody>
+          {kpis.data ? (
+            <View style={styles.row}>
+              <Metric label="Active hogs" value={formatInteger(kpis.data.active_hogs_count)} />
+              <Metric label="Avg daily gain" value={formatNumber(kpis.data.avg_daily_gain_kg)} />
+              <Metric label="Farm today" value={kpis.data.date_to} small />
+            </View>
+          ) : (
+            <Text style={[text.meta, { color: colors.muted }]}>
+              {kpis.error ? errorMessage(kpis.error) : 'Loading…'}
+            </Text>
+          )}
+        </CardBody>
+      </Card>
+    </>
+  )
+}
+
+function Metric({ label, value, small }: { label: string; value: string; small?: boolean }) {
   const { colors } = useTheme()
   return (
     <View style={styles.metric}>
       <Text style={[eyebrow, { color: colors.muted }]}>{label}</Text>
-      <Text style={[figure(figureSize.lg), styles.metricValue, { color: tone }]}>{value}</Text>
-      <Text style={[text.meta, { color: colors.muted }]}>seeded farm</Text>
+      <Text style={[figure(small ? figureSize.sm : figureSize.md), { color: colors.ink }]}>
+        {value}
+      </Text>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  stack: { gap: space.md },
   row: { flexDirection: 'row', gap: space.md, flexWrap: 'wrap' },
-  stack: { gap: space.lg },
-  pills: { flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' },
-  metric: { flex: 1, minWidth: 90 },
-  metricValue: { marginTop: 6 },
+  metric: { flex: 1, minWidth: 100, gap: 4 },
 })
