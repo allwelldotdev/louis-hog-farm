@@ -59,7 +59,7 @@ Other useful targets:
 
 ## Tests
 
-`make test` runs both suites: **pytest** for the backend (78 tests, against a `hogfarm_test`
+`make test` runs both suites: **pytest** for the backend (93 tests, against a `hogfarm_test`
 database on the same Postgres container) and **Vitest + jsdom** for the dashboard (25 tests).
 Backend tests skip rather than fail when Postgres is unreachable, so a stopped container does not
 look like a broken build.
