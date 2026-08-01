@@ -134,6 +134,21 @@ dev: env-check ## Boot the whole stack in tmux: db, migrations, API, dashboard, 
 		echo "session '$(TMUX_SESSION)' already running — attaching"; \
 		exec tmux attach -t $(TMUX_SESSION); \
 	fi
+	@# The tmux-session check above only catches a second `make dev`. It says
+	@# nothing about a process started outside tmux — a stray `make api`,
+	@# `make web`, or a manual uvicorn — still holding 8000 or 3000. Left
+	@# running, that leaves the API or web pane dying on "Address already in
+	@# use" while this recipe still echoes success below. Fail fast here with
+	@# a diagnosis instead of a silently dead pane.
+	@for p in 8000 3000; do \
+		if (exec 3<>/dev/tcp/127.0.0.1/$$p) 2>/dev/null; then \
+			exec 3<&- 3>&-; \
+			echo "ERROR: port $$p is already in use by something outside this session."; \
+			echo "  Find it:  lsof -i :$$p   (or: ss -ltnp | grep :$$p)"; \
+			echo "  Stop that process, then retry make dev."; \
+			exit 1; \
+		fi; \
+	done
 	@# Database and schema first, in this shell. A pane that dies because the
 	@# migration had not finished scrolls away unread.
 	$(MAKE) db-up db-wait migrate
