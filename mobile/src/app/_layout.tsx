@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { loadBaseUrl } from '@/api-runtime'
+import { AuthProvider } from '@/components/auth-provider'
 import { QueryProvider } from '@/components/providers'
 import { ThemeProvider, useTheme } from '@/theme/theme-provider'
 
@@ -24,8 +25,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
+        {/* Auth sits inside Query: signing out clears the cache, and the
+            expiry handler needs a client to clear. */}
         <QueryProvider>
-          <AppShell />
+          <AuthProvider>
+            <AppShell />
+          </AuthProvider>
         </QueryProvider>
       </ThemeProvider>
     </SafeAreaProvider>
