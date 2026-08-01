@@ -102,7 +102,15 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update My Farm
+         * @description Rename the farm. Manager-only, and the name is the only editable field.
+         *
+         *     There is no farm_id in the path: a manager administers exactly one farm, and
+         *     accepting an id would be an authorization decision this endpoint does not
+         *     need to make.
+         */
+        patch: operations["update_my_farm_api_v1_farms_me_patch"];
         trace?: never;
     };
     "/api/v1/users": {
@@ -145,6 +153,33 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Staff Role
+         * @description Move a colleague between worker and viewer. Manager-only, farm-scoped.
+         *
+         *     Two guards, both about not being able to lock a farm out of its own
+         *     settings. Nothing in this application can promote anyone to manager — not
+         *     registration, which always creates a new farm, and not `POST /users`, whose
+         *     schema refuses the role. So a manager who could demote themselves, or each
+         *     other, would leave the farm with no one able to administer it and no way
+         *     back short of editing the database.
+         */
+        patch: operations["update_staff_role_api_v1_users__user_id__patch"];
         trace?: never;
     };
     "/api/v1/hogs": {
@@ -504,7 +539,9 @@ export interface paths {
          *
          *     Doubles as the breed facet for the dashboard's filters — the list offered in
          *     the UI is exactly what this returns, so there is no separate facets endpoint
-         *     that could fall out of step with the data.
+         *     that could fall out of step with the data. That is also why this is the one
+         *     panel that takes no `breed` parameter: a facet narrowed to the value already
+         *     selected offers one option and no way back.
          */
         get: operations["get_breed_distribution_api_v1_dashboard_breed_distribution_get"];
         put?: never;
@@ -565,7 +602,9 @@ export interface paths {
          *
          *     The gain denominator counts only animals weighed in both the bucket and the
          *     one before it, so a sale or a birth between buckets cannot masquerade as
-         *     herd growth.
+         *     herd growth. A breed filter narrows both sides of that ratio, so the cost
+         *     per kilogram stays a like-for-like figure rather than one breed's spend over
+         *     the whole herd's gain.
          */
         get: operations["get_feed_cost_series_api_v1_dashboard_feed_cost_series_get"];
         put?: never;
@@ -953,6 +992,8 @@ export interface components {
             total_hogs: number;
             /** Rows */
             rows: components["schemas"]["DistributionRow"][];
+            /** Breed Filter */
+            breed_filter?: string | null;
         };
         /** DistributionRow */
         DistributionRow: {
@@ -982,6 +1023,19 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * FarmUpdate
+         * @description The name, and only the name.
+         *
+         *     Currency and timezone stay server-owned. Feed records store `currency_code`
+         *     at write time for historical accuracy, so changing a farm's currency would
+         *     leave the money charts summing two units; the timezone is set per deployment
+         *     and moving it silently reinterprets what "today" meant for existing records.
+         */
+        FarmUpdate: {
+            /** Name */
+            name: string;
         };
         /** FeedCostPoint */
         FeedCostPoint: {
@@ -1015,6 +1069,8 @@ export interface components {
             currency_code: string;
             /** Points */
             points: components["schemas"]["FeedCostPoint"][];
+            /** Breed Filter */
+            breed_filter?: string | null;
         };
         /** FeedRecordCreate */
         FeedRecordCreate: {
@@ -1541,6 +1597,16 @@ export interface components {
          * @enum {string}
          */
         UserRole: "manager" | "worker" | "viewer" | "admin";
+        /**
+         * UserRoleUpdate
+         * @description The role, and only the role.
+         *
+         *     Name, email and password stay with the account holder — a manager who can
+         *     silently rewrite a colleague's email owns their sign-in.
+         */
+        UserRoleUpdate: {
+            role: components["schemas"]["UserRole"];
+        };
         /** VaccinationCreate */
         VaccinationCreate: {
             /** Hog Id */
@@ -1773,6 +1839,39 @@ export interface operations {
             };
         };
     };
+    update_my_farm_api_v1_farms_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FarmUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_users_api_v1_users_get: {
         parameters: {
             query?: {
@@ -1854,6 +1953,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+        };
+    };
+    update_staff_role_api_v1_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2971,6 +3105,8 @@ export interface operations {
             query?: {
                 date_from?: string | null;
                 date_to?: string | null;
+                /** @description Exact breed filter (optional) */
+                breed?: string | null;
             };
             header?: never;
             path?: never;
@@ -3038,6 +3174,8 @@ export interface operations {
                 date_from?: string | null;
                 date_to?: string | null;
                 interval?: "day" | "week";
+                /** @description Exact breed filter (optional) */
+                breed?: string | null;
             };
             header?: never;
             path?: never;
@@ -3093,7 +3231,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                export_key: "hogs" | "users" | "feed_records" | "health_records" | "breeding_cycles" | "alerts" | "alert_rules";
+                export_key: "hogs" | "users" | "feed_records" | "health_records" | "vaccinations" | "mortality_events" | "breeding_cycles" | "alerts" | "alert_rules";
             };
             cookie?: never;
         };

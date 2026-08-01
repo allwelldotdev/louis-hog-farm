@@ -424,10 +424,16 @@ class TestMetaAndFarm:
 
 
 def _hog_with_growth(
-    client: TestClient, auth: dict[str, Any], tag: str, first_kg: str, last_kg: str, feed_kg: str
+    client: TestClient,
+    auth: dict[str, Any],
+    tag: str,
+    first_kg: str,
+    last_kg: str,
+    feed_kg: str,
+    breed: str = "Duroc",
 ) -> dict[str, Any]:
     """A hog with two weigh-ins 30 days apart and one feed record."""
-    hog = _make_hog(client, auth, tag_number=tag)
+    hog = _make_hog(client, auth, tag_number=tag, breed=breed)
     for day, kg in (("2026-06-01", first_kg), ("2026-07-01", last_kg)):
         client.post(
             f"{API}/health-records",
@@ -631,6 +637,44 @@ class TestDashboardCharts:
         ).json()
         assert body["currency_code"] == "NGN"
         assert sum(p["feed_cost"] for p in body["points"]) == 1000.0
+
+    def test_feed_cost_series_honours_the_breed_filter(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """This panel used to ignore the dashboard's breed filter entirely."""
+        _hog_with_growth(client, registered, "FC-D", "50.0", "80.0", "60.0")
+        _hog_with_growth(client, registered, "FC-L", "50.0", "80.0", "60.0", breed="Landrace")
+        body = client.get(
+            f"{API}/dashboard/feed-cost-series?interval=week&breed=Duroc&{self.RANGE}",
+            headers=registered["headers"],
+        ).json()
+        assert body["breed_filter"] == "Duroc"
+        assert sum(p["feed_cost"] for p in body["points"]) == 1000.0
+
+    def test_production_class_distribution_honours_the_breed_filter(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        _make_hog(client, registered, tag_number="PCB-1", production_class="sow", sex="female")
+        _make_hog(client, registered, tag_number="PCB-2", breed="Landrace")
+        body = client.get(
+            f"{API}/dashboard/production-class-distribution?breed=Duroc",
+            headers=registered["headers"],
+        ).json()
+        assert body["breed_filter"] == "Duroc"
+        assert body["total_hogs"] == 1
+        assert body["rows"][0]["key"] == "sow"
+
+    def test_breed_distribution_stays_the_unfiltered_facet(
+        self, client: TestClient, registered: dict[str, Any]
+    ) -> None:
+        """It is the source of the filter's own options, so it never narrows."""
+        _make_hog(client, registered, tag_number="BDF-1")
+        _make_hog(client, registered, tag_number="BDF-2", breed="Landrace")
+        body = client.get(
+            f"{API}/dashboard/breed-distribution?breed=Duroc", headers=registered["headers"]
+        ).json()
+        assert body["total_hogs"] == 2
+        assert body["breed_filter"] is None
 
     def test_alert_summary_counts_by_status_and_type(
         self, client: TestClient, registered: dict[str, Any]
@@ -986,6 +1030,39 @@ class TestExports:
         assert (
             client.get(f"{API}/exports/nonsense", headers=registered["headers"]).status_code == 422
         )
+
+    def test_vaccinations_export(self, client: TestClient, registered: dict[str, Any]) -> None:
+        hog = _make_hog(client, registered, tag_number="EXP-VAC")
+        client.post(
+            f"{API}/vaccinations",
+            json={
+                "hog_id": hog["id"],
+                "vaccine_name": "Erysipelas",
+                "dose_date": "2026-07-01",
+                "next_due_date": "2026-10-01",
+            },
+            headers=registered["headers"],
+        )
+        r = client.get(f"{API}/exports/vaccinations", headers=registered["headers"])
+        assert r.status_code == 200
+        lines = [ln for ln in r.text.splitlines() if ln.strip()]
+        assert lines[0] == "id,hog_id,vaccine_name,dose_date,next_due_date,notes,created_at"
+        assert len(lines) == 2
+        assert "Erysipelas" in lines[1]
+
+    def test_mortality_export(self, client: TestClient, registered: dict[str, Any]) -> None:
+        hog = _make_hog(client, registered, tag_number="EXP-MORT")
+        client.post(
+            f"{API}/mortality-events",
+            json={"hog_id": hog["id"], "event_date": "2026-07-02", "cause": "Illness"},
+            headers=registered["headers"],
+        )
+        r = client.get(f"{API}/exports/mortality_events", headers=registered["headers"])
+        assert r.status_code == 200
+        lines = [ln for ln in r.text.splitlines() if ln.strip()]
+        assert lines[0] == "id,hog_id,event_date,cause,notes,created_at"
+        assert len(lines) == 2
+        assert "Illness" in lines[1]
 
 
 class TestHealth:

@@ -18,7 +18,9 @@ from app.models.breeding_cycle import BreedingCycle
 from app.models.feed_record import FeedRecord
 from app.models.health_record import HealthRecord
 from app.models.hog import Hog
+from app.models.mortality_event import MortalityEvent
 from app.models.user import User
+from app.models.vaccination import Vaccination
 
 router = APIRouter(prefix="/exports", tags=["exports"])
 
@@ -27,6 +29,8 @@ ExportKey = Literal[
     "users",
     "feed_records",
     "health_records",
+    "vaccinations",
+    "mortality_events",
     "breeding_cycles",
     "alerts",
     "alert_rules",
@@ -239,6 +243,83 @@ def _spec_health_records(farm_id: int, date_from: date | None, date_to: date | N
     )
 
 
+def _spec_vaccinations(farm_id: int, date_from: date | None, date_to: date | None) -> ExportSpec:
+    stmt = (
+        select(
+            Vaccination.id,
+            Vaccination.hog_id,
+            Vaccination.vaccine_name,
+            Vaccination.dose_date,
+            Vaccination.next_due_date,
+            Vaccination.notes,
+            Vaccination.created_at,
+        )
+        .where(Vaccination.farm_id == farm_id)
+        .order_by(Vaccination.dose_date, Vaccination.id)
+    )
+    # Windowed on the dose date, not the next due date: the export answers what
+    # was administered in a period, and a dose given inside the window with a
+    # due date outside it still happened inside it.
+    if date_from is not None:
+        stmt = stmt.where(Vaccination.dose_date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Vaccination.dose_date <= date_to)
+    return ExportSpec(
+        header=[
+            "id",
+            "hog_id",
+            "vaccine_name",
+            "dose_date",
+            "next_due_date",
+            "notes",
+            "created_at",
+        ],
+        stmt=stmt,
+        format_row=lambda r: [
+            str(r[0]),
+            str(r[1]),
+            r[2],
+            r[3].isoformat(),
+            "" if r[4] is None else r[4].isoformat(),
+            _flat(r[5]),
+            r[6].isoformat(),
+        ],
+    )
+
+
+def _spec_mortality_events(
+    farm_id: int, date_from: date | None, date_to: date | None
+) -> ExportSpec:
+    stmt = (
+        select(
+            MortalityEvent.id,
+            MortalityEvent.hog_id,
+            MortalityEvent.event_date,
+            MortalityEvent.cause,
+            MortalityEvent.notes,
+            MortalityEvent.created_at,
+        )
+        .where(MortalityEvent.farm_id == farm_id)
+        .order_by(MortalityEvent.event_date, MortalityEvent.id)
+    )
+    if date_from is not None:
+        stmt = stmt.where(MortalityEvent.event_date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(MortalityEvent.event_date <= date_to)
+    return ExportSpec(
+        header=["id", "hog_id", "event_date", "cause", "notes", "created_at"],
+        stmt=stmt,
+        format_row=lambda r: [
+            str(r[0]),
+            str(r[1]),
+            r[2].isoformat(),
+            r[3],
+            _flat(r[4]),
+            r[5].isoformat(),
+        ],
+    )
+
+
 def _spec_breeding_cycles(farm_id: int, date_from: date | None, date_to: date | None) -> ExportSpec:
     stmt = (
         select(
@@ -368,6 +449,8 @@ _EXPORTS: dict[str, Callable[[int, date | None, date | None], ExportSpec]] = {
     "users": _spec_users,
     "feed_records": _spec_feed_records,
     "health_records": _spec_health_records,
+    "vaccinations": _spec_vaccinations,
+    "mortality_events": _spec_mortality_events,
     "breeding_cycles": _spec_breeding_cycles,
     "alerts": _spec_alerts,
     "alert_rules": _spec_alert_rules,

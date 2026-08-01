@@ -256,10 +256,11 @@ def _distribution(
     date_from: date | None,
     date_to: date | None,
     by: Literal["breed", "production_class"],
+    breed: str | None = None,
 ) -> DistributionResponse:
     start, end = _default_range(date_from, date_to, timezone)
-    groups = group_active_hogs(db, farm_id, end, by)
-    adg_rows = compute_adg_rows(fetch_weight_endpoints_in_range(db, farm_id, start, end, None))
+    groups = group_active_hogs(db, farm_id, end, by, breed)
+    adg_rows = compute_adg_rows(fetch_weight_endpoints_in_range(db, farm_id, start, end, breed))
 
     adg_by_key: dict[str, list[float]] = defaultdict(list)
     for r in adg_rows:
@@ -282,6 +283,7 @@ def _distribution(
             )
             for g in groups
         ],
+        breed_filter=breed,
     )
 
 
@@ -297,7 +299,9 @@ def get_breed_distribution(
 
     Doubles as the breed facet for the dashboard's filters — the list offered in
     the UI is exactly what this returns, so there is no separate facets endpoint
-    that could fall out of step with the data.
+    that could fall out of step with the data. That is also why this is the one
+    panel that takes no `breed` parameter: a facet narrowed to the value already
+    selected offers one option and no way back.
     """
     return _distribution(db, user.farm_id, user.farm.timezone, date_from, date_to, "breed")
 
@@ -309,9 +313,10 @@ def get_production_class_distribution(
     cache: DashboardCache,
     date_from: date | None = None,
     date_to: date | None = None,
+    breed: str | None = Query(default=None, description="Exact breed filter (optional)"),
 ) -> DistributionResponse:
     return _distribution(
-        db, user.farm_id, user.farm.timezone, date_from, date_to, "production_class"
+        db, user.farm_id, user.farm.timezone, date_from, date_to, "production_class", breed
     )
 
 
@@ -347,16 +352,19 @@ def get_feed_cost_series(
     date_from: date | None = None,
     date_to: date | None = None,
     interval: Interval = "week",
+    breed: str | None = Query(default=None, description="Exact breed filter (optional)"),
 ) -> FeedCostSeriesResponse:
     """Feed spend per bucket, and what each kilogram of gain cost.
 
     The gain denominator counts only animals weighed in both the bucket and the
     one before it, so a sale or a birth between buckets cannot masquerade as
-    herd growth.
+    herd growth. A breed filter narrows both sides of that ratio, so the cost
+    per kilogram stays a like-for-like figure rather than one breed's spend over
+    the whole herd's gain.
     """
     start, end = _default_range(date_from, date_to, user.farm.timezone)
     gains = compute_bucket_gains(
-        latest_weight_per_hog_by_bucket(db, user.farm_id, start, end, interval)
+        latest_weight_per_hog_by_bucket(db, user.farm_id, start, end, interval, breed)
     )
     return FeedCostSeriesResponse(
         date_from=start,
@@ -373,9 +381,10 @@ def get_feed_cost_series(
                 ),
             )
             for bucket, feed_kg, feed_cost in feed_totals_by_bucket(
-                db, user.farm_id, start, end, interval
+                db, user.farm_id, start, end, interval, breed
             )
         ],
+        breed_filter=breed,
     )
 
 

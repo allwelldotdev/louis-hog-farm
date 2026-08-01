@@ -45,6 +45,18 @@ const EXPORTS: Export[] = [
     dated: true,
   },
   {
+    key: 'vaccinations',
+    label: 'Vaccinations',
+    description: 'Every dose administered, with the date the next one falls due.',
+    dated: true,
+  },
+  {
+    key: 'mortality_events',
+    label: 'Mortality',
+    description: 'Deaths with their recorded cause.',
+    dated: true,
+  },
+  {
     key: 'breeding_cycles',
     label: 'Breeding cycles',
     description: 'Service and farrowing dates with outcomes.',
@@ -103,7 +115,7 @@ export function ExportsView() {
       <Card>
         <CardHeader>
           <h2 className="text-sm font-medium text-ink">Available exports</h2>
-          <p className="text-xs text-muted">{EXPORTS.length} of 9 record types</p>
+          <p className="text-xs text-muted">{EXPORTS.length} record types</p>
         </CardHeader>
 
         <ul>
@@ -133,19 +145,6 @@ export function ExportsView() {
             </li>
           ))}
         </ul>
-      </Card>
-
-      {/* Stated rather than quietly omitted. Offering seven downloads on a page
-          that looks complete is how a reader concludes the other two do not
-          exist as data. */}
-      <Card>
-        <CardBody className="space-y-1">
-          <p className="text-sm text-ink">Vaccinations and mortality have no export</p>
-          <p className="text-xs text-muted">
-            Both tables are recorded in the app and shown on their own pages, but the API exposes no
-            CSV for either. Adding them is a backend change.
-          </p>
-        </CardBody>
       </Card>
     </div>
   )

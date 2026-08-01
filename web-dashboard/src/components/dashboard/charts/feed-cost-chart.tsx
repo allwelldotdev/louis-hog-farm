@@ -13,7 +13,6 @@ import {
   TooltipShell,
 } from '@/components/dashboard/charts/chart-primitives'
 import { useFeedCostSeries } from '@/hooks/use-dashboard'
-import { useDashboardFilters } from '@/hooks/use-dashboard-filters'
 import { formatBusinessDate, formatMoney, formatMoneyCompact, formatNumber } from '@/lib/format'
 
 /**
@@ -31,14 +30,13 @@ import { formatBusinessDate, formatMoney, formatMoneyCompact, formatNumber } fro
  */
 export function FeedCostChart() {
   const query = useFeedCostSeries()
-  const { filters } = useDashboardFilters()
   const points = query.data?.points ?? []
   const currency = query.data?.currency_code ?? 'NGN'
 
-  // Feed is booked against the farm, not the breed, so this route takes no
-  // breed filter. Said plainly rather than left to be inferred from a total
-  // that does not move when the filter does.
-  const scope = filters.breed ? ' · whole herd, not just the filtered breed' : ''
+  // The breed filter narrows both halves of the ratio — the spend and the gain
+  // it is divided by — so cost per kg stays a like-for-like figure rather than
+  // one breed's feed bill over the whole herd's growth.
+  const scope = query.data?.breed_filter ? ` · ${query.data.breed_filter} only` : ''
 
   const data = points.map((point) => ({
     bucket: point.bucket,

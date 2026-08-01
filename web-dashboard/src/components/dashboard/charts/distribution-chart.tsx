@@ -41,25 +41,23 @@ export const PRODUCTION_CLASS_ORDER = [
 ] as const
 
 /**
- * Neither grouping is breed-filtered — the API does not accept `breed` on
- * either route, and for the breed chart it would be incoherent anyway, since it
- * is the facet the filter is chosen from.
- *
- * That has to be said out loud rather than left for someone to notice: with a
- * breed selected, the KPI row reports ten animals while these cards still count
- * sixty, and a card that quietly answers a different question than the one the
- * filter asked is worse than a card that admits it.
+ * The breed grouping is the one card that stays unfiltered, and it has to say
+ * so: it is the facet the breed filter is chosen from, so narrowing it to the
+ * current selection would leave the dropdown holding one option and no way
+ * back. With a breed selected the KPI row reports ten animals while this card
+ * still counts sixty, and a card that quietly answers a different question than
+ * the one the filter asked is worse than a card that admits it.
  */
-function useWholeHerdNote(): string {
+function useFacetNote(): string {
   const { filters } = useDashboardFilters()
-  return filters.breed ? ' · all breeds, not just the filtered one' : ''
+  return filters.breed ? ' · all breeds, so the filter keeps its options' : ''
 }
 
 export function BreedDistributionChart() {
   return (
     <DistributionChart
       title="Breed composition"
-      hint={`Active hogs by breed, largest first${useWholeHerdNote()}`}
+      hint={`Active hogs by breed, largest first${useFacetNote()}`}
       query={useBreedDistribution()}
       order="count"
       emptyMessage="No hogs on record yet."
@@ -71,7 +69,7 @@ export function ProductionClassDistributionChart() {
   return (
     <DistributionChart
       title="Herd composition"
-      hint={`Active hogs by production class, youngest first${useWholeHerdNote()}`}
+      hint="Active hogs by production class, youngest first"
       query={useProductionClassDistribution()}
       order={PRODUCTION_CLASS_ORDER}
       emptyMessage="No hogs on record yet."

@@ -70,7 +70,7 @@ export function useBreedDistribution() {
 
 export function useProductionClassDistribution() {
   const { filters } = useDashboardFilters()
-  const params = toQueryParams(filters, ['date_from', 'date_to'])
+  const params = toQueryParams(filters, ['date_from', 'date_to', 'breed'])
 
   return useQuery({
     queryKey: queryKeys.dashboard('production-class-distribution', params),
@@ -91,7 +91,7 @@ export function useWeightDistribution() {
 
 export function useFeedCostSeries() {
   const { filters } = useDashboardFilters()
-  const params = toQueryParams(filters, ['date_from', 'date_to'])
+  const params = toQueryParams(filters, ['date_from', 'date_to', 'breed'])
 
   return useQuery({
     queryKey: queryKeys.dashboard('feed-cost-series', params),

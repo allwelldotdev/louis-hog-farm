@@ -109,6 +109,9 @@ class DistributionResponse(BaseModel):
     group_by: str
     total_hogs: int
     rows: list[DistributionRow]
+    # Always null for the breed grouping, which is the facet source and is
+    # deliberately never narrowed. See `group_active_hogs`.
+    breed_filter: str | None = None
 
 
 class WeightBucketOut(BaseModel):
@@ -141,6 +144,7 @@ class FeedCostSeriesResponse(BaseModel):
     interval: str
     currency_code: str
     points: list[FeedCostPoint]
+    breed_filter: str | None = None
 
 
 class AlertSummaryResponse(BaseModel):

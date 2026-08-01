@@ -94,28 +94,28 @@ def latest_weight_per_hog_by_bucket(
     date_from: date,
     date_to: date,
     interval: Interval,
+    breed: str | None = None,
 ) -> list[tuple[date, int, float]]:
     """Each hog's last weigh-in within each bucket, as `(bucket, hog_id, kg)`."""
     bucket = _bucket(interval, HealthRecord.record_date)
-    ranked = (
-        select(
-            bucket.label("bucket"),
-            HealthRecord.hog_id,
-            HealthRecord.weight,
-            func.row_number()
-            .over(
-                partition_by=(bucket, HealthRecord.hog_id),
-                order_by=(HealthRecord.record_date.desc(), HealthRecord.id.desc()),
-            )
-            .label("rn"),
+    ranked_stmt = select(
+        bucket.label("bucket"),
+        HealthRecord.hog_id,
+        HealthRecord.weight,
+        func.row_number()
+        .over(
+            partition_by=(bucket, HealthRecord.hog_id),
+            order_by=(HealthRecord.record_date.desc(), HealthRecord.id.desc()),
         )
-        .where(
-            HealthRecord.farm_id == farm_id,
-            HealthRecord.record_date >= date_from,
-            HealthRecord.record_date <= date_to,
-        )
-        .subquery("ranked")
+        .label("rn"),
+    ).where(
+        HealthRecord.farm_id == farm_id,
+        HealthRecord.record_date >= date_from,
+        HealthRecord.record_date <= date_to,
     )
+    if breed:
+        ranked_stmt = ranked_stmt.join(Hog, HealthRecord.hog_id == Hog.id).where(Hog.breed == breed)
+    ranked = ranked_stmt.subquery("ranked")
     rows = db.execute(
         select(ranked.c.bucket, ranked.c.hog_id, ranked.c.weight).where(ranked.c.rn == 1)
     ).all()
@@ -148,23 +148,22 @@ def feed_totals_by_bucket(
     date_from: date,
     date_to: date,
     interval: Interval,
+    breed: str | None = None,
 ) -> list[tuple[date, float, float]]:
     """`(bucket, feed_kg, feed_cost)` per bucket."""
     bucket = _bucket(interval, FeedRecord.record_date)
-    rows = db.execute(
-        select(
-            bucket.label("bucket"),
-            func.coalesce(func.sum(FeedRecord.feed_amount), 0),
-            func.coalesce(func.sum(FeedRecord.feed_cost), 0),
-        )
-        .where(
-            FeedRecord.farm_id == farm_id,
-            FeedRecord.record_date >= date_from,
-            FeedRecord.record_date <= date_to,
-        )
-        .group_by(bucket)
-        .order_by(bucket)
-    ).all()
+    stmt = select(
+        bucket.label("bucket"),
+        func.coalesce(func.sum(FeedRecord.feed_amount), 0),
+        func.coalesce(func.sum(FeedRecord.feed_cost), 0),
+    ).where(
+        FeedRecord.farm_id == farm_id,
+        FeedRecord.record_date >= date_from,
+        FeedRecord.record_date <= date_to,
+    )
+    if breed:
+        stmt = stmt.join(Hog, FeedRecord.hog_id == Hog.id).where(Hog.breed == breed)
+    rows = db.execute(stmt.group_by(bucket).order_by(bucket)).all()
     return [(r[0], float(r[1]), float(r[2])) for r in rows]
 
 
@@ -190,22 +189,27 @@ def group_active_hogs(
     farm_id: int,
     date_to: date,
     by: Literal["breed", "production_class"],
+    breed: str | None = None,
 ) -> list[GroupRow]:
     """Active herd composition by breed or production class, with mean weight.
 
-    Doubles as the filter facet for the dashboard: the breed list the UI offers
-    is exactly the breeds this returns, so there is no separate facets endpoint
-    to keep in step.
+    Grouped by breed, this doubles as the filter facet for the dashboard: the
+    breed list the UI offers is exactly the breeds this returns, so there is no
+    separate facets endpoint to keep in step — which is also why the breed
+    grouping is called without a `breed` filter. Narrowing the facet to the
+    value already selected would leave the filter bar with one option and no way
+    back.
     """
     latest = _latest_weights(farm_id, date_to).subquery("latest")
     column = Hog.breed if by == "breed" else Hog.production_class
-    rows = db.execute(
+    stmt = (
         select(column, func.count(Hog.id), func.avg(latest.c.weight))
         .outerjoin(latest, latest.c.hog_id == Hog.id)
         .where(Hog.farm_id == farm_id, Hog.status == HogStatus.active)
-        .group_by(column)
-        .order_by(func.count(Hog.id).desc(), column)
-    ).all()
+    )
+    if breed:
+        stmt = stmt.where(Hog.breed == breed)
+    rows = db.execute(stmt.group_by(column).order_by(func.count(Hog.id).desc(), column)).all()
     return [
         GroupRow(
             key=key.value if hasattr(key, "value") else str(key),
