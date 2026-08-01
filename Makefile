@@ -99,8 +99,13 @@ delete-farm: env-check ## Delete a farm and all its data: make delete-farm NAME=
 
 ## --------------------------------------------------------------- run ----
 
-api: env-check ## Run the API with autoreload on :8000
-	cd $(BACKEND) && uv run uvicorn app.main:app --reload --port 8000
+# `--host 0.0.0.0`, not uvicorn's default 127.0.0.1: the mobile app runs on a
+# phone, which reaches this machine over the LAN. Bound to loopback the phone
+# gets connection-refused, and React Native surfaces that as a bare "Network
+# request failed" with no status code to diagnose from. Dev target only —
+# the container path in docker-compose.yml is unaffected.
+api: env-check ## Run the API with autoreload on :8000, reachable from the LAN
+	cd $(BACKEND) && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 web: ## Run the web dashboard dev server
 	cd $(WEB) && npm run dev
