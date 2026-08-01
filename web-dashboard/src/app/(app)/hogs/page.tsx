@@ -14,20 +14,17 @@ function TableSkeleton() {
  * live in the URL, and `useSearchParams` opts the subtree out of prerendering;
  * and the persisted query cache is invisible to the server, so markup that
  * depends on whether the list has loaded cannot be server-rendered honestly.
+ *
+ * The heading lives inside `HogsTable` rather than here, as it does on the
+ * record pages: the Add button belongs beside it and has to know the role,
+ * which is a client concern.
  */
 export default function HogsPage() {
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <p className="eyebrow">Herd</p>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Hogs</h1>
-      </div>
-
-      <Suspense fallback={<TableSkeleton />}>
-        <ClientOnly fallback={<TableSkeleton />}>
-          <HogsTable />
-        </ClientOnly>
-      </Suspense>
-    </div>
+    <Suspense fallback={<TableSkeleton />}>
+      <ClientOnly fallback={<TableSkeleton />}>
+        <HogsTable />
+      </ClientOnly>
+    </Suspense>
   )
 }

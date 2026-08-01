@@ -1,14 +1,16 @@
 'use client'
 
 import type { ColumnDef } from '@tanstack/react-table'
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import Link from 'next/link'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import { DataTable } from '@/components/data-table'
 import { StatusBadge } from '@/components/hogs/hog-badges'
+import { HogForm } from '@/components/hogs/hog-form'
 import { Button } from '@/components/ui/button'
 import { Label, Select } from '@/components/ui/field'
+import { usePermissions } from '@/hooks/use-current-user'
 import { useBreedDistribution } from '@/hooks/use-dashboard'
 import { useDashboardFilters } from '@/hooks/use-dashboard-filters'
 import { HOGS_PAGE_LIMIT, useHogs } from '@/hooks/use-hogs'
@@ -51,6 +53,8 @@ export function HogsTable() {
   const { filters, setFilters, isFiltered } = useDashboardFilters()
   const { data: breeds } = useBreedDistribution()
   const query = useHogs()
+  const { canWrite } = usePermissions()
+  const [isFormOpen, setFormOpen] = useState(false)
 
   const rows = useMemo(() => query.data?.items ?? [], [query.data])
 
@@ -135,35 +139,58 @@ export function HogsTable() {
     ]
   }, [tagById])
 
+  const total = query.data?.total ?? 0
+  const truncated = total > rows.length
+
+  const header = (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="space-y-1">
+        <p className="eyebrow">Herd</p>
+        <h1 className="text-xl font-semibold tracking-tight text-ink">Hogs</h1>
+      </div>
+
+      {/* Absent rather than disabled for a viewer, as everywhere else. */}
+      {canWrite ? (
+        <Button onClick={() => setFormOpen(true)}>
+          <Plus aria-hidden />
+          Add hog
+        </Button>
+      ) : null}
+    </div>
+  )
+
   if (query.isError) {
     return (
-      <div className="space-y-3 rounded-card border border-rule bg-surface px-5 py-6">
-        <p className="text-sm text-alert">{query.error.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
-          Try again
-        </Button>
+      <div className="space-y-6">
+        {header}
+        <div className="space-y-3 rounded-card border border-rule bg-surface px-5 py-6">
+          <p className="text-sm text-alert">{query.error.message}</p>
+          <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+            Try again
+          </Button>
+        </div>
       </div>
     )
   }
 
   if (query.isPending) {
-    return <div className="h-96 animate-pulse rounded-card bg-surface" />
+    return (
+      <div className="space-y-6">
+        {header}
+        <div className="h-96 animate-pulse rounded-card bg-surface" />
+      </div>
+    )
   }
-
-  const total = query.data.total
-  const truncated = total > rows.length
 
   return (
     <div className="space-y-4">
+      {header}
+
       <DataTable
         columns={columns}
         data={rows}
         getRowId={(hog) => String(hog.id)}
         initialSort={[{ id: 'tag_number', desc: false }]}
-        // Lineage is off by default: it is recorded only for animals born on
-        // the farm, so for most rosters these are two columns of em-dashes.
-        // Still one click away in the Columns menu when it matters.
-        initialVisibility={{ dam: false, sire: false }}
         emptyMessage={
           isFiltered ? 'No animal matches these filters.' : 'No hogs recorded on this farm yet.'
         }
@@ -239,6 +266,8 @@ export function HogsTable() {
           Narrow the filters to see the rest.
         </p>
       ) : null}
+
+      {canWrite ? <HogForm open={isFormOpen} onClose={() => setFormOpen(false)} /> : null}
     </div>
   )
 }

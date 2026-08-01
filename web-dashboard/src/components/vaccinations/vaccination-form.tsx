@@ -23,7 +23,15 @@ const schema = z.object({
 
 type FormValues = z.input<typeof schema>
 
-export function VaccinationForm({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function VaccinationForm({
+  open,
+  onClose,
+  hogId,
+}: {
+  open: boolean
+  onClose: () => void
+  hogId?: number
+}) {
   const farm = useFarm()
   const create = useCreateVaccination()
   const today = farmToday(farm.data?.timezone ?? 'UTC')
@@ -36,7 +44,7 @@ export function VaccinationForm({ open, onClose }: { open: boolean; onClose: () 
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      hog_id: '',
+      hog_id: hogId ? String(hogId) : '',
       vaccine_name: '',
       dose_date: today,
       next_due_date: '',

@@ -1,24 +1,28 @@
 'use client'
 
 import type { ColumnDef } from '@tanstack/react-table'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, Pencil, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 
 import { DataTable } from '@/components/data-table'
 import { StatusBadge } from '@/components/hogs/hog-badges'
+import { HogForm } from '@/components/hogs/hog-form'
 import { HogGrowthChart } from '@/components/hogs/hog-growth-chart'
 import { FeedRecordForm } from '@/components/records/feed-record-form'
 import { HealthRecordForm } from '@/components/records/health-record-form'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
+import { VaccinationForm } from '@/components/vaccinations/vaccination-form'
 import { usePermissions } from '@/hooks/use-current-user'
 import { useFarm } from '@/hooks/use-farm'
-import { useHog } from '@/hooks/use-hogs'
+import { useHog, useHogTags } from '@/hooks/use-hogs'
 import { useFeedRecords, useHealthRecords } from '@/hooks/use-records'
-import type { FeedRecord, HealthRecord } from '@/lib/api/types'
+import { useVaccinations } from '@/hooks/use-vaccinations'
+import type { FeedRecord, HealthRecord, Vaccination } from '@/lib/api/types'
 import {
   NO_VALUE,
+  farmToday,
   formatBusinessDate,
   formatInteger,
   formatMoney,
@@ -41,11 +45,19 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-function ParentLink({ id }: { id: number | null }) {
+/**
+ * A parent, named the way the farm names it.
+ *
+ * The roster is already in memory for the record tables, so the id resolves to
+ * an ear tag; a parent missing from it falls back to its id rather than
+ * vanishing. "Not recorded" is the honest answer for a genuine null — and it is
+ * now a state the Edit form can change.
+ */
+function ParentLink({ id, tags }: { id: number | null; tags: Map<number, string> }) {
   if (id === null) return <span className="text-muted">Not recorded</span>
   return (
     <Link href={`/hogs/${id}`} className="text-ochre hover:underline">
-      #{formatInteger(id)}
+      {tags.get(id) ?? `#${formatInteger(id)}`}
     </Link>
   )
 }
@@ -55,10 +67,15 @@ export function HogDetail({ hogId }: { hogId: number }) {
   const hog = useHog(hogId)
   const health = useHealthRecords({ hogId })
   const feed = useFeedRecords({ hogId })
+  const vaccinations = useVaccinations(hogId)
+  const tags = useHogTags()
   const { canWrite } = usePermissions()
   const [isHealthFormOpen, setHealthFormOpen] = useState(false)
   const [isFeedFormOpen, setFeedFormOpen] = useState(false)
+  const [isVaccinationFormOpen, setVaccinationFormOpen] = useState(false)
+  const [isEditOpen, setEditOpen] = useState(false)
   const currency = farm.data?.currency_code ?? 'NGN'
+  const today = farmToday(farm.data?.timezone ?? 'UTC')
 
   const healthColumns = useMemo<ColumnDef<HealthRecord, never>[]>(
     () => [
@@ -146,6 +163,58 @@ export function HogDetail({ hogId }: { hogId: number }) {
     [currency],
   )
 
+  const vaccinationColumns = useMemo<ColumnDef<Vaccination, never>[]>(
+    () => [
+      {
+        id: 'dose_date',
+        accessorKey: 'dose_date',
+        header: 'Given',
+        enableHiding: false,
+        cell: (info) => (
+          <span className="text-ink">
+            {formatBusinessDate(info.getValue(), {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </span>
+        ),
+      },
+      {
+        id: 'vaccine_name',
+        accessorKey: 'vaccine_name',
+        header: 'Vaccine',
+        cell: (info) => <span className="text-ink">{info.getValue()}</span>,
+      },
+      {
+        id: 'next_due_date',
+        accessorKey: 'next_due_date',
+        header: 'Next due',
+        cell: (info) => {
+          const value = info.getValue() as string | null
+          if (value === null) return <span className="text-muted">{NO_VALUE}</span>
+          // The same overdue test the vaccinations page and the alert engine
+          // use, so all three agree about which dose is late.
+          const overdue = value < today
+          return (
+            <span className={overdue ? 'text-alert' : 'text-muted'}>
+              {formatBusinessDate(value, { day: 'numeric', month: 'short', year: 'numeric' })}
+              {overdue ? ' · overdue' : ''}
+            </span>
+          )
+        },
+      },
+      {
+        id: 'notes',
+        accessorKey: 'notes',
+        header: 'Notes',
+        enableSorting: false,
+        cell: (info) => <span className="text-muted">{info.getValue() ?? NO_VALUE}</span>,
+      },
+    ],
+    [today],
+  )
+
   if (hog.isPending) {
     return <div className="h-96 animate-pulse rounded-card bg-surface" />
   }
@@ -190,6 +259,12 @@ export function HogDetail({ hogId }: { hogId: number }) {
       <Card>
         <CardHeader>
           <h2 className="text-sm font-medium text-ink">Record</h2>
+          {canWrite ? (
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Pencil aria-hidden />
+              Edit
+            </Button>
+          ) : null}
         </CardHeader>
         <CardBody>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -199,16 +274,47 @@ export function HogDetail({ hogId }: { hogId: number }) {
             <Fact label="Breed">{animal.breed}</Fact>
             <Fact label="Class">{humanize(animal.production_class)}</Fact>
             <Fact label="Dam">
-              <ParentLink id={animal.dam_id} />
+              <ParentLink id={animal.dam_id} tags={tags} />
             </Fact>
             <Fact label="Sire">
-              <ParentLink id={animal.sire_id} />
+              <ParentLink id={animal.sire_id} tags={tags} />
             </Fact>
           </dl>
         </CardBody>
       </Card>
 
       <HogGrowthChart hogId={hogId} />
+
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-medium text-ink">Vaccinations</h2>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted">
+              {formatInteger(vaccinations.data?.total)}{' '}
+              {vaccinations.data?.total === 1 ? 'dose' : 'doses'}
+            </p>
+            {canWrite ? (
+              <Button variant="outline" size="sm" onClick={() => setVaccinationFormOpen(true)}>
+                <Plus aria-hidden />
+                Add
+              </Button>
+            ) : null}
+          </div>
+        </CardHeader>
+        <CardBody>
+          {vaccinations.isPending ? (
+            <div className="h-48 animate-pulse rounded-control bg-raised" />
+          ) : (
+            <DataTable
+              columns={vaccinationColumns}
+              data={vaccinations.data?.items ?? []}
+              getRowId={(record) => String(record.id)}
+              initialSort={[{ id: 'dose_date', desc: true }]}
+              emptyMessage="No vaccinations recorded for this animal."
+            />
+          )}
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -271,7 +377,7 @@ export function HogDetail({ hogId }: { hogId: number }) {
         </CardBody>
       </Card>
 
-      {/* Both forms open with this animal already chosen — the point of coming
+      {/* Every form opens with this animal already chosen — the point of coming
           here to record something is that you already know which animal. */}
       {canWrite ? (
         <>
@@ -285,6 +391,12 @@ export function HogDetail({ hogId }: { hogId: number }) {
             onClose={() => setFeedFormOpen(false)}
             hogId={hogId}
           />
+          <VaccinationForm
+            open={isVaccinationFormOpen}
+            onClose={() => setVaccinationFormOpen(false)}
+            hogId={hogId}
+          />
+          <HogForm open={isEditOpen} onClose={() => setEditOpen(false)} hog={animal} />
         </>
       ) : null}
     </div>

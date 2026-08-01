@@ -3,8 +3,16 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { toQueryParams, useDashboardFilters } from '@/hooks/use-dashboard-filters'
-import { apiGet } from '@/lib/api/client'
-import type { GrowthSeries, Hog, Page, ProductionClass } from '@/lib/api/types'
+import { useFarmMutation } from '@/hooks/use-farm-mutation'
+import { apiGet, apiSend } from '@/lib/api/client'
+import type {
+  GrowthSeries,
+  Hog,
+  HogCreate,
+  HogUpdate,
+  Page,
+  ProductionClass,
+} from '@/lib/api/types'
 import { queryKeys } from '@/lib/query/keys'
 
 /**
@@ -47,21 +55,34 @@ function useRoster() {
 }
 
 /**
- * Animals a record can be written against — active only, since a record for an
- * archived or dead animal is not a thing anyone means to enter.
+ * Animals a record can be written against — active only by default, since a
+ * record for an archived or dead animal is not a thing anyone means to enter.
  *
  * `productionClasses` narrows it further for breeding, where the API rejects a
  * cycle with 400 unless the hog is a sow or gilt.
+ *
+ * `includeInactive` exists for lineage, which is the one case that means the
+ * opposite: a dam that has since been sold or has died is still the animal's
+ * mother, and a picker that hides her makes the pedigree unrecordable. `exclude`
+ * keeps a hog out of its own parent pickers.
  */
-export function useHogPicker(productionClasses?: readonly ProductionClass[]) {
+export function useHogPicker(options?: {
+  productionClasses?: readonly ProductionClass[]
+  includeInactive?: boolean
+  exclude?: number
+}) {
   const query = useRoster()
 
-  const options = (query.data?.items ?? [])
-    .filter((hog) => hog.status === 'active')
-    .filter((hog) => !productionClasses || productionClasses.includes(hog.production_class))
+  const items = (query.data?.items ?? [])
+    .filter((hog) => options?.includeInactive || hog.status === 'active')
+    .filter(
+      (hog) =>
+        !options?.productionClasses || options.productionClasses.includes(hog.production_class),
+    )
+    .filter((hog) => hog.id !== options?.exclude)
     .sort((a, b) => a.tag_number.localeCompare(b.tag_number))
 
-  return { ...query, options }
+  return { ...query, options: items }
 }
 
 /**
@@ -92,4 +113,17 @@ export function useHogGrowth(hogId: number) {
     queryKey: queryKeys.detail('hog-growth', hogId),
     queryFn: () => apiGet<GrowthSeries>(`/hogs/${hogId}/growth`),
   })
+}
+
+export function useCreateHog() {
+  return useFarmMutation((body: HogCreate) => apiSend<Hog>('POST', '/hogs', body))
+}
+
+/**
+ * `PATCH /hogs/{id}` distinguishes an absent key from an explicit null, and only
+ * for `dam_id` / `sire_id` — that is how lineage is cleared. So the caller sends
+ * the keys it means to change and nothing else.
+ */
+export function useUpdateHog(hogId: number) {
+  return useFarmMutation((body: HogUpdate) => apiSend<Hog>('PATCH', `/hogs/${hogId}`, body))
 }
