@@ -34,6 +34,18 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# --- Mobile (Expo / React Native) ---
+# The bulk of the mobile ignores live in mobile/.gitignore, which is Expo's own
+# and stays in step with the SDK. Repeated here only where it matters that a
+# stray build never reaches a commit from the repo root.
+mobile/.expo/
+mobile/expo-env.d.ts
+mobile/android/
+mobile/ios/
+mobile/*.tsbuildinfo
+*.keystore
+*.jks
+
 # --- Docker ---
 *.pid
 

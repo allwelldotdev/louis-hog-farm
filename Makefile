@@ -4,6 +4,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := backend
 WEB     := web-dashboard
+MOBILE  := mobile
 PG_USER := $(or $(POSTGRES_USER),hogfarm)
 PG_DB   := $(or $(POSTGRES_DB),hogfarm)
 
@@ -16,8 +17,8 @@ export
 endif
 
 .PHONY: help env-check install db-up db-down db-wait psql farm-users db-reset migrate migrate-down \
-        revision seed seed-bulk seed-reset delete-farm api web up up-all down logs build ps lint fmt \
-        typecheck test check types build-web dev dev-stop clean
+        revision seed seed-bulk seed-reset delete-farm api web mobile up up-all down logs build ps \
+        lint fmt typecheck test check types build-web dev dev-stop clean
 
 TMUX_SESSION := hogfarm
 
@@ -40,9 +41,10 @@ env-check: ## Verify .env exists and carries the required values
 
 ## ------------------------------------------------------------- setup ----
 
-install: ## Install backend (uv) and dashboard (npm) dependencies
+install: ## Install backend (uv), dashboard and mobile (npm) dependencies
 	cd $(BACKEND) && uv sync --all-groups
 	cd $(WEB) && npm ci
+	cd $(MOBILE) && npm ci
 
 ## ---------------------------------------------------------- database ----
 
@@ -109,6 +111,13 @@ api: env-check ## Run the API with autoreload on :8000, reachable from the LAN
 
 web: ## Run the web dashboard dev server
 	cd $(WEB) && npm run dev
+
+# Deliberately not a `make dev` pane. Metro owns the terminal (it wants the `r`
+# / `j` keypresses), the phone workflow is its own loop, and `make dev`'s port
+# guard covers 8000/3000 only — adding 8081 there would make `make dev` refuse
+# to start whenever a perfectly healthy Metro is already running elsewhere.
+mobile: ## Run the Expo dev server (Metro on :8081) for Expo Go
+	cd $(MOBILE) && npx expo start
 
 up: ## Build and start the full stack in containers (db + migrate + api)
 	$(COMPOSE) up -d --build
@@ -180,28 +189,33 @@ dev-stop: ## Kill the tmux session (the database container keeps running)
 
 ## ----------------------------------------------------------- quality ----
 
-lint: ## Lint backend and dashboard
+lint: ## Lint backend, dashboard and mobile
 	cd $(BACKEND) && uv run ruff check .
 	cd $(WEB) && npx eslint .
+	cd $(MOBILE) && npx eslint .
 
-fmt: ## Format backend and dashboard
+fmt: ## Format backend, dashboard and mobile
 	cd $(BACKEND) && uv run ruff format . && uv run ruff check --fix .
 	cd $(WEB) && npx prettier --write .
+	cd $(MOBILE) && npx prettier --write .
 
-typecheck: ## Typecheck backend (mypy) and dashboard (tsc)
+typecheck: ## Typecheck backend (mypy), dashboard and mobile (tsc)
 	cd $(BACKEND) && uv run mypy .
 	cd $(WEB) && npx tsc --noEmit
+	cd $(MOBILE) && npx tsc --noEmit
 
-test: ## Run the backend and dashboard test suites
+test: ## Run the backend, dashboard and mobile test suites
 	cd $(BACKEND) && uv run pytest -q
 	cd $(WEB) && npx vitest run
+	cd $(MOBILE) && npx vitest run
 
 check: lint typecheck test ## Run everything the Stop-hook quality gate runs
 
-types: ## Regenerate dashboard API types from the running backend's OpenAPI document
+types: ## Regenerate dashboard and mobile API types from the running backend's OpenAPI document
 	@curl -sf http://127.0.0.1:8000/openapi.json >/dev/null \
 		|| { echo "ERROR: the API must be running. Start it with: make api"; exit 1; }
 	cd $(WEB) && npm run types
+	cd $(MOBILE) && npm run types
 
 build-web: ## Production build of the dashboard (run before `tsc` — it generates .next/types)
 	cd $(WEB) && npm run build
@@ -209,4 +223,5 @@ build-web: ## Production build of the dashboard (run before `tsc` — it generat
 clean: ## Remove caches and build artefacts
 	rm -rf $(BACKEND)/.mypy_cache $(BACKEND)/.pytest_cache $(BACKEND)/.ruff_cache
 	rm -rf $(WEB)/.next $(WEB)/*.tsbuildinfo
+	rm -rf $(MOBILE)/.expo $(MOBILE)/*.tsbuildinfo
 	find . -name '__pycache__' -type d -not -path './*/node_modules/*' -prune -exec rm -rf {} +
