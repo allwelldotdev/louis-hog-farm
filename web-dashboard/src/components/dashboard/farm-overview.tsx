@@ -5,12 +5,16 @@ import { useDataVersion, useFarm } from '@/hooks/use-farm'
 import { formatBusinessDate, formatInteger } from '@/lib/format'
 
 /**
- * What the dashboard shows before the charts land in P8.
+ * The farm record, and the live data-version counter.
  *
- * Not a placeholder: it reads live values through the full path this phase
- * exists to build — httpOnly cookie, Next passthrough route, FastAPI, ETag
- * revalidation, TanStack cache — so if any link in that chain is broken it
- * shows here rather than in a chart three phases later.
+ * It reads through the full path — httpOnly cookie, Next passthrough route,
+ * FastAPI, ETag revalidation, TanStack cache — so if any link in that chain
+ * breaks it shows here rather than in a chart. The counter is the visible proof
+ * that the Postgres trigger → poll → invalidate loop is running, which is why
+ * the card survived the charts landing.
+ *
+ * No active-hog count: the KPI row above already carries it, and one number
+ * printed twice on one screen is a number a reader has to reconcile.
  */
 export function FarmOverview() {
   const { data: farm, isPending, isError } = useFarm()
@@ -29,7 +33,6 @@ export function FarmOverview() {
   }
 
   const rows: { label: string; value: string }[] = [
-    { label: 'Active hogs', value: farm ? formatInteger(farm.hog_count) : '—' },
     { label: 'Timezone', value: farm?.timezone ?? '—' },
     {
       label: 'Farm created',

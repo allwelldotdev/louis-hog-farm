@@ -101,7 +101,7 @@ export function Leaderboard() {
                 <td className={cn('py-2.5 pr-4', row.is_underperformer && 'pl-2')}>
                   <span className="figure text-ink">{row.tag_number}</span>
                   {row.is_underperformer ? (
-                    <span className="ml-2 rounded-sm bg-alert/15 px-1.5 py-0.5 text-[0.6875rem] text-alert">
+                    <span className="ml-2 rounded-sm bg-alert-wash px-1.5 py-0.5 text-[0.6875rem] text-alert">
                       Behind
                     </span>
                   ) : null}

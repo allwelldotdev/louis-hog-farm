@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { ThemeToggle } from '@/components/app-shell/theme-toggle'
 import { SignInForm } from '@/components/auth/sign-in-form'
 import { GrowthBand } from '@/components/growth-band'
 import { Wordmark } from '@/components/wordmark'
@@ -43,8 +44,15 @@ export default async function SignInPage({
 
       <section className="flex flex-col justify-center px-6 py-12 sm:px-12">
         <div className="mx-auto w-full max-w-sm space-y-8">
-          <div className="lg:hidden">
-            <Wordmark />
+          {/* The toggle is here as well as in the app shell so a light-preferring
+              visitor is not met by a dark sign-in before any preference exists.
+              It works outside the `(app)` providers because the theme store is
+              an attribute on <html>, not a React context. */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="lg:hidden">
+              <Wordmark />
+            </div>
+            <ThemeToggle />
           </div>
 
           <div className="space-y-2">

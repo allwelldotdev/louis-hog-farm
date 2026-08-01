@@ -44,7 +44,7 @@ export function Modal({
         event.preventDefault()
         onClose()
       }}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-card border border-rule bg-surface p-0 text-ink backdrop:bg-black/70"
+      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-card border border-rule bg-surface p-0 text-ink backdrop:bg-scrim"
     >
       <div className="flex items-start justify-between gap-4 border-b border-rule px-5 py-3.5">
         <div className="min-w-0">

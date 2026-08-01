@@ -8,17 +8,46 @@
    also what lets the Recharts wrapper read chart colours from the same place
    the UI reads its own.
 
-   Direction: a control room after dark. Deep cool slate, one warm ochre accent
-   carrying every piece of live data, and hairline rules borrowed from a ruled
-   farm ledger. Two muted signal colours — sage and brick — because a herd
-   dashboard has to say "gaining" and "losing" and an accent alone cannot.
+   Two themes, one token set. Every colour utility compiles to
+   `background-color: var(--color-x)`, so swapping the variable retints the whole
+   app and not one component needs a `dark:` variant or knows which theme it is
+   in. Charts come free: their colours reach the DOM as literal `var()` strings
+   and SVG resolves them at paint.
 
-   Dark only, deliberately. "Dark-first control room" is the brief, and a
-   half-committed light mode reads worse than none; the tokens are namespaced so
-   a light theme is a value swap rather than a rewrite.
+   Dark is the default — it is what the app shipped as, and what a visitor with
+   JavaScript disabled gets. Light is the same room in daylight: beige-pink, low
+   chroma, and never white, because a screen someone reads for eight hours
+   should not glare.
+
+   Three structural notes, each load-bearing:
+
+   * `@theme` may not be nested and compiles to `:root, :host`, so a second
+     `@theme` cannot express the light override. Tailwind's layer order is
+     `theme, base, components, utilities`, so a plain rule in `@layer base` wins
+     over it without any specificity games.
+   * `static` is not cosmetic. Tailwind drops theme variables no utility uses,
+     per entry chunk — the sign-in bundle references neither `--color-gain` nor
+     any `--color-chart-*`. The light block below is plain CSS and is never
+     dropped, so without `static` a token would be defined in light and
+     undefined in dark on exactly the routes that do not use it.
+   * `color-scheme` sits on the root selectors, not on `html`. Native `<select>`,
+     the `accent-*` checkbox and the platform `<dialog>` are painted by the
+     browser from that property, not from these tokens.
 --------------------------------------------------------------------------- */
 
-@theme {
+/* No `dark:` utility exists in this codebase and none should: Tailwind's stock
+   variant tracks `prefers-color-scheme`, which would disagree with the toggle
+   the moment anyone reached for it. These point both variants at the attribute
+   the toggle actually writes. */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
+@custom-variant dark (&:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *));
+
+@theme static {
+  /* --- Dark: a control room after dark ------------------------------------
+     Deep cool slate, one warm ochre accent carrying every piece of live data,
+     and hairline rules borrowed from a ruled farm ledger. Two muted signal
+     colours — sage and brick — because a herd dashboard has to say "gaining"
+     and "losing" and an accent alone cannot. */
   --color-ground: #0e1116;
   --color-surface: #151a21;
   --color-raised: #1c222b;
@@ -26,19 +55,45 @@
   --color-rule-strong: #313a47;
   --color-muted: #8a96a6;
   --color-ink: #e8eaed;
+
+  /* The foreground of a solid accent fill. `text-ground` happened to work in
+     dark and would have inverted in light; naming the role fixes both. */
+  --color-on-accent: #0e1116;
+
   --color-ochre: #c8873b;
   --color-ochre-dim: #8a5d28;
-  --color-ochre-wash: #2a1f12;
   --color-gain: #6e9c6b;
-  --color-alert: #c1554a;
+  /* Lifted from #c1554a, which was 4.20:1 on the ground and 3.88:1 on a card —
+     already below AA, and this is the colour of every form error. */
+  --color-alert: #d06a5d;
+
+  /* Badge grounds. Opaque rather than `bg-gain/15`, because 15% of a *dark* hue
+     over a pale surface is dominated by the surface: in light mode the three
+     washes composite to #e0e0d8, #eed8d5 and #ebddd1 — three tints of the same
+     beige, and a triage list needs "open" and "resolved" tellable apart. */
+  --color-ochre-wash: #2a2118;
+  --color-gain-wash: #1e2a26;
+  --color-alert-wash: #291d1c;
+
+  /* The modal veil, alpha baked in so each theme picks its own. */
+  --color-scrim: rgb(5 7 10 / 0.72);
 
   /* Chart series read straight off these, so a chart can never drift from the
-     UI palette. Ochre leads; the rest are its neighbours around the wheel. */
+     UI palette. Ochre leads; the rest are its neighbours around the wheel.
+     chart-1 must equal `ochre` and chart-3 must equal `gain` in both themes:
+     the tooltip crosshair uses the raw accent while the series use these, and
+     breaking that makes the crosshair stop matching the median line. */
   --color-chart-1: #c8873b;
   --color-chart-2: #7c9bb5;
   --color-chart-3: #6e9c6b;
   --color-chart-4: #b5766b;
   --color-chart-5: #9184ad;
+
+  /* A panel shadow that knows what it sits on. A dark theme lifts with black; a
+     pale one lifts with warm brown, because black over beige reads as dirt. */
+  --shadow-panel:
+    0 10px 15px -3px rgb(0 0 0 / 0.45),
+    0 4px 6px -4px rgb(0 0 0 / 0.45);
 
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
@@ -70,7 +125,57 @@
 }
 
 @layer base {
-  html {
+  /* --- Light: the same room, in daylight ---------------------------------
+     Warm and low-chroma throughout. The page sits four points below the card
+     rather than above it, so a card still lifts off the background without
+     anything reaching pure white. `raised` inverts relative to dark — in light
+     it is a tint, not a lighter step, because lighter than #fdf6f3 is white and
+     white is glare. Every consumer (sidebar pill, row hover, skeletons, bar
+     cursor) wants "a step away from the card", and the direction is irrelevant
+     to all of them. */
+  :root[data-theme='light'] {
+    color-scheme: light;
+
+    --color-ground: #f4e9e4;
+    --color-surface: #fdf6f3;
+    --color-raised: #ede1da;
+    --color-rule: #e4d3ca;
+    --color-rule-strong: #cbb4a9;
+    --color-muted: #6f5f59;
+    --color-ink: #241b18;
+    --color-on-accent: #fdf8f6;
+
+    /* Burnt ochre, same hue family with the lightness flipped. The dark value
+       is 2.2:1 on a pale ground, and `text-ochre` is every link in the app. */
+    --color-ochre: #8a5613;
+    /* Inverts because its only consumer is the ::selection background sitting
+       under `text-ink`. */
+    --color-ochre-dim: #eccfa8;
+    --color-gain: #42663f;
+    --color-alert: #9c3728;
+
+    --color-ochre-wash: #f7e6cd;
+    --color-gain-wash: #dee9da;
+    --color-alert-wash: #fadcd4;
+
+    /* Warm brown at lower opacity: black at 70% over beige is a hole in the
+       page rather than a veil over it. */
+    --color-scrim: rgb(59 42 36 / 0.42);
+
+    --color-chart-1: #8a5613;
+    --color-chart-2: #3f6b8a;
+    --color-chart-3: #42663f;
+    --color-chart-4: #8f4f42;
+    --color-chart-5: #655a86;
+
+    --shadow-panel:
+      0 10px 15px -3px rgb(94 66 55 / 0.14),
+      0 4px 6px -4px rgb(94 66 55 / 0.12);
+  }
+
+  /* Dark is the default, so the scheme hint lives on the bare root and the
+     light block above overrides it. */
+  :root {
     color-scheme: dark;
   }
 

@@ -7,7 +7,7 @@ const button = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-ochre text-ground hover:bg-ochre/90',
+        primary: 'bg-ochre text-on-accent hover:bg-ochre/90',
         outline:
           'border border-rule bg-transparent text-ink hover:border-rule-strong hover:bg-raised',
         ghost: 'text-muted hover:bg-raised hover:text-ink',

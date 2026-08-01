@@ -8,9 +8,9 @@ import { cn } from '@/lib/utils'
  * mortality event. Every other field is just text and is left as text.
  */
 const STATUS_TONE: Record<HogStatus, string> = {
-  active: 'bg-gain/15 text-gain',
+  active: 'bg-gain-wash text-gain',
   archived: 'bg-raised text-muted',
-  deceased: 'bg-alert/15 text-alert',
+  deceased: 'bg-alert-wash text-alert',
 }
 
 export function StatusBadge({ status }: { status: HogStatus }) {

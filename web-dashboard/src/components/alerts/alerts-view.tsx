@@ -30,9 +30,9 @@ const STATUSES: AlertStatus[] = ['open', 'acknowledged', 'resolved']
 const TYPES: AlertType[] = ['growth_anomaly', 'vaccination_due', 'breeding_event', 'data_gap']
 
 const STATUS_TONE: Record<AlertStatus, string> = {
-  open: 'bg-alert/15 text-alert',
-  acknowledged: 'bg-ochre/15 text-ochre',
-  resolved: 'bg-gain/15 text-gain',
+  open: 'bg-alert-wash text-alert',
+  acknowledged: 'bg-ochre-wash text-ochre',
+  resolved: 'bg-gain-wash text-gain',
 }
 
 const LIMIT = 200

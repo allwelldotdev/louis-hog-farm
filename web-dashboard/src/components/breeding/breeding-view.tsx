@@ -23,9 +23,9 @@ const GESTATION_DAYS = 114
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }
 
 const STATUS_TONE: Record<BreedingStatus, string> = {
-  ongoing: 'bg-ochre/15 text-ochre',
-  completed: 'bg-gain/15 text-gain',
-  aborted: 'bg-alert/15 text-alert',
+  ongoing: 'bg-ochre-wash text-ochre',
+  completed: 'bg-gain-wash text-gain',
+  aborted: 'bg-alert-wash text-alert',
 }
 
 /** Farrowing is 114 days after service. The date is not stored — it is derived,

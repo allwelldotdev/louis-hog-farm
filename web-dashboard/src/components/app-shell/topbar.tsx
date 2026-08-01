@@ -1,6 +1,7 @@
 'use client'
 
 import { SignOutButton } from '@/components/app-shell/sign-out-button'
+import { ThemeToggle } from '@/components/app-shell/theme-toggle'
 import { useCurrentUser } from '@/hooks/use-current-user'
 import { useFarm } from '@/hooks/use-farm'
 import { ROLE_LABELS } from '@/lib/auth/permissions'
@@ -34,7 +35,10 @@ export function Topbar() {
           </p>
         </div>
 
-        <SignOutButton />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
       </div>
     </header>
   )

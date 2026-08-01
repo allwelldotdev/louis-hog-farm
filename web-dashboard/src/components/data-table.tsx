@@ -237,7 +237,7 @@ function ColumnMenu<TData>({ table }: { table: Table<TData> }) {
         Columns
       </summary>
 
-      <div className="absolute right-0 z-10 mt-2 w-48 rounded-card border border-rule bg-surface p-2 shadow-lg shadow-black/40">
+      <div className="absolute right-0 z-10 mt-2 w-48 rounded-card border border-rule bg-surface p-2 shadow-panel">
         {hideable.map((column) => (
           <label
             key={column.id}

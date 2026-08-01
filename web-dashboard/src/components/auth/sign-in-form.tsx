@@ -64,7 +64,7 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
 
       {error ? (
         <p
-          className="rounded-control border border-alert/40 bg-alert/10 px-3 py-2 text-sm text-alert"
+          className="rounded-control border border-alert-wash bg-alert-wash px-3 py-2 text-sm text-alert"
           role="alert"
         >
           {error}

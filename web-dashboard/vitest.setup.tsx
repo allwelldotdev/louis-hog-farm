@@ -1,6 +1,8 @@
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeAll, vi } from 'vitest'
 
+import { THEME_STORAGE_KEY } from '@/lib/theme/theme'
+
 /**
  * Every dashboard hook reads its filters from the URL, and `useSearchParams`
  * throws outside a mounted App Router. Standing in an empty query string is
@@ -82,8 +84,32 @@ function stubDialog() {
   }
 }
 
+/**
+ * jsdom implements no media queries at all — `window.matchMedia` is undefined
+ * rather than merely inert — and the theme store calls it on every subscribe.
+ *
+ * Reporting `matches: false` for `(prefers-color-scheme: light)` resolves to
+ * the dark default, which is the state every existing test was written against.
+ */
+function stubMatchMedia() {
+  if (typeof globalThis.matchMedia === 'function') return
+
+  globalThis.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList
+}
+
 beforeAll(() => {
   stubDialog()
+  stubMatchMedia()
   globalThis.ResizeObserver = FixedSizeResizeObserver
 
   // Recharts also measures through the DOM directly; jsdom reports zero for
@@ -102,3 +128,21 @@ beforeAll(() => {
 })
 
 afterEach(cleanup)
+
+/**
+ * The theme store is module-level and mutates `document.documentElement` and
+ * `localStorage`, both of which survive `cleanup()` and are shared across files
+ * in a worker. `restoreMocks` resets neither.
+ *
+ * Guarded the same way the store itself is: jsdom does not always provide a
+ * working `localStorage`, and a cleanup hook must not be the thing that fails a
+ * test that never touched the theme.
+ */
+afterEach(() => {
+  document.documentElement.removeAttribute('data-theme')
+  try {
+    localStorage.removeItem(THEME_STORAGE_KEY)
+  } catch {
+    // No storage in this environment; nothing to clear.
+  }
+})

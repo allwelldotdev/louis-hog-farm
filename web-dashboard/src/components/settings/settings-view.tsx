@@ -42,7 +42,7 @@ function RoleBadge({ role }: { role: UserRole }) {
     <span
       className={cn(
         'shrink-0 rounded-sm px-1.5 py-0.5 text-[0.6875rem] font-medium',
-        role === 'viewer' ? 'bg-raised text-muted' : 'bg-ochre/15 text-ochre',
+        role === 'viewer' ? 'bg-raised text-muted' : 'bg-ochre-wash text-ochre',
       )}
     >
       {ROLE_LABELS[role]}
