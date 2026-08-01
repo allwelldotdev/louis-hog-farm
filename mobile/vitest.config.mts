@@ -15,14 +15,18 @@ import { defineConfig } from 'vitest/config'
  * broken <View> is a blank screen you notice in two seconds; a sparkline that
  * divides by zero is a wrong chart nobody questions.
  *
- * The rule that keeps this honest: nothing under `src/lib/` may import
- * `react-native` or `expo-*`. Platform access is injected (see
- * `src/api-runtime.ts`), so these modules load in plain node.
+ * The rule that keeps this honest: any module with a `.test.ts` beside it must
+ * be free of `react-native` and `expo-*` imports. Platform access is injected
+ * (see `src/api-runtime.ts`), so these modules load in plain node.
+ *
+ * `.test.ts` only, never `.test.tsx` — the extension is the boundary. A file
+ * needing JSX needs a renderer, and that is the machinery this config exists
+ * to avoid.
  */
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/lib/**/*.test.ts'],
+    include: ['src/**/*.test.ts'],
     restoreMocks: true,
   },
   resolve: {
