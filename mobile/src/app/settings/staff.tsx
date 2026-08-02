@@ -14,7 +14,7 @@ import { SegmentedChips } from '@/components/ui/segmented-chips'
 import { useCurrentUser, usePermissions } from '@/hooks/use-farm'
 import { useFarmMutation } from '@/hooks/use-farm-mutation'
 import { errorMessage } from '@/lib/api/errors'
-import type { UserRead, UserRole } from '@/lib/api/types'
+import type { Page, UserRead, UserRole } from '@/lib/api/types'
 import { ROLE_LABELS, STAFF_ROLES, canChangeRoleOf } from '@/lib/auth/permissions'
 import { queryKeys } from '@/lib/query/keys'
 import { useColors } from '@/theme/theme-provider'
@@ -70,8 +70,12 @@ function StaffRoster() {
   const me = useCurrentUser()
   const { data, isPending, error } = useQuery({
     queryKey: queryKeys.list('users'),
-    queryFn: () => api.get<UserRead[]>('/users'),
+    // `/users` returns the same paginated envelope as every other list
+    // endpoint, so the roster lives under `.items` — not at the top level.
+    queryFn: () => api.get<Page<UserRead>>('/users'),
   })
+
+  const users = data?.items
 
   return (
     <Screen>
@@ -79,17 +83,17 @@ function StaffRoster() {
       <AddStaff />
 
       <Card>
-        <CardHeader title="Accounts" hint={data ? `${data.length} on this farm` : undefined} />
+        <CardHeader title="Accounts" hint={users ? `${users.length} on this farm` : undefined} />
         <CardBody>
           {isPending ? (
             <Skeleton height={72} />
           ) : error ? (
             <Banner tone="alert" message={errorMessage(error)} />
-          ) : (data?.length ?? 0) === 0 ? (
+          ) : (users?.length ?? 0) === 0 ? (
             <EmptyState message="No accounts yet." />
           ) : (
             <View style={styles.stack}>
-              {data?.map((user) => (
+              {users?.map((user) => (
                 <StaffRow key={user.id} user={user} currentUserId={me.data?.id} />
               ))}
             </View>
