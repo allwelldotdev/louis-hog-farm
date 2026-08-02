@@ -42,7 +42,7 @@ then continue with step 3.
 | `uv` | manages the backend's Python 3.12 environment | `uv --version` — check at install time whether your platform needs Python 3.12 preinstalled or whether `uv` fetches it for you |
 | Node.js via [nvm](https://github.com/nvm-sh/nvm) | runs the dashboard and mobile dev servers | `cd web-dashboard && nvm install` (picks up the pinned version from `.nvmrc`, currently `25.7`; `mobile/.nvmrc` pins the same `25.7`) |
 | npm | comes bundled with Node | `npm --version` |
-| Expo Go (optional) | try the mobile app on a real Android phone | install from the Play Store; the phone must be on the **same wifi network** as this machine |
+| `adb` (optional) | sideload/inspect the mobile app on a physical Android phone | comes with [Android Studio](https://developer.android.com/studio) or the standalone [platform-tools](https://developer.android.com/tools/releases/platform-tools) package; `adb devices -l` |
 
 Not needed: a host `psql` client (`make psql` runs it inside the container) or a standalone Python
 install.
@@ -72,9 +72,10 @@ not the repo root, because that is where Expo reads `.env` from:
 cp mobile/.env.example mobile/.env
 ```
 
-It holds a single variable, `EXPO_PUBLIC_API_URL`. Left blank it is fine for a normal Expo Go
-session (the app falls back to whatever host served the Metro bundle); see step 7 for when you
-need to set it explicitly.
+It holds a single variable, `EXPO_PUBLIC_API_URL`. Left blank it's fine for the emulator/dev-client
+workflow (the app falls back to whatever host served the Metro bundle); the release-APK sideload
+workflow bakes in a server address at build time, changeable at runtime from the app itself. See
+step 7 for both workflows.
 
 ## 5. Install, provision the database, migrate
 
@@ -144,29 +145,70 @@ manager accounts unless you create a viewer user yourself.
 
 ### Mobile app (optional)
 
-The mobile app has been built but has **not yet been run on a real phone** — if you try it, you are
-genuinely the first person to do so, and should expect some first-run friction.
+The mobile app has been verified end-to-end both on an Android emulator and on a physical Android
+phone (a Samsung A54 5G). Two workflows are supported; sideloading a release APK onto a real phone
+is the one to reach for as a reviewer — it needs no Android Studio/emulator setup on your machine,
+just a phone and a USB cable (or Wi-Fi for repeat use).
+
+**Note:** plain **Expo Go** (the Play Store app) crashes on x86_64 Android emulators — a confirmed
+emulator/Expo Go interaction, not an app bug — and was not tried on the physical phone either, so
+it is not a recommended path here. Both workflows below go around it.
+
+**1. Sideload a release APK onto a physical phone (recommended for reviewers)**
 
 ```bash
-make mobile                  # cd mobile && npx expo start — Metro on :8081
+cd mobile/android && ./gradlew assembleRelease
 ```
 
-This is deliberately **not** part of `make dev`'s tmux session: Metro wants its own terminal for
-the `r` / `j` keypresses, and `make dev`'s port guard only checks 8000/3000, so folding 8081 in
-there would make `make dev` refuse to start whenever a healthy Metro is already running elsewhere.
+This produces one universal APK covering all four Android ABIs (arm64-v8a, armeabi-v7a, x86,
+x86_64), already signed with the debug keystore so it installs directly with no separate signing
+step: `mobile/android/app/build/outputs/apk/release/app-release.apk`.
 
-To run it on a phone:
-1. Install **Expo Go** on the phone and make sure it's on **the same wifi** as this machine.
-2. Run `make mobile` and scan the QR code from Expo Go.
-3. The app needs to reach the FastAPI backend directly (unlike the dashboard, there is no
-   server-side proxy). Find this machine's LAN address with `hostname -I`, and if the app can't
-   auto-detect it, set `EXPO_PUBLIC_API_URL=http://<lan-ip>:8000` in `mobile/.env` (restart Metro
-   after editing it) — or set the server address directly on the phone from the sign-in screen or
-   Settings. **Never use `localhost`** here; on the phone that means the phone itself.
+Install it either over USB —
 
-A fresh clone that runs `make typecheck` before ever starting Metro once can show errors from a
-missing generated `mobile/expo-env.d.ts` file — running `make mobile` once generates it and the
-errors go away.
+```bash
+adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
+```
+
+— or by copying the APK to the phone some other way (file share, email, cloud drive) and opening
+it; the phone will need "install from unknown sources" allowed for whatever app opens it.
+
+The phone must be on the same Wi-Fi/LAN as the machine running `make dev`. Cleartext `http://`
+traffic to the backend is allowed even in this release build (`mobile/app.json` sets
+`expo-build-properties` → `android.usesCleartextTraffic: true`). If the backend's LAN IP ever
+doesn't match what was baked into the build, use the in-app "Change server address" screen
+(Settings, or the "Change" link on the sign-in screen) to point it at a new address with no
+rebuild needed.
+
+**2. Emulator + dev client (day-to-day iteration)**
+
+One-time per emulator AVD, with the emulator running:
+
+```bash
+cd mobile && npx expo run:android   # builds and installs a dev client; slow on first run (Gradle/NDK)
+```
+
+After that, day-to-day iteration is:
+
+```bash
+adb reverse tcp:8000 tcp:8000 && adb reverse tcp:8081 tcp:8081   # once per emulator boot
+# with `make dev` already running:
+cd mobile && npx expo start --dev-client
+```
+
+**Linux only — phone invisible to `adb`.** If `adb devices -l` shows nothing after plugging in a
+phone with USB debugging enabled, but `lsusb` sees it, you're missing a udev rule. Add one to
+`/etc/udev/rules.d/` (Samsung's vendor id is `04e8`):
+
+```
+SUBSYSTEM=="usb", ATTR{idVendor}=="04e8", MODE="0666", GROUP="plugdev"
+```
+
+Then `sudo udevadm control --reload-rules && sudo udevadm trigger` and unplug/replug the cable.
+
+A fresh clone that runs `make typecheck` before ever starting Metro/a dev client once can show
+errors from a missing generated `mobile/expo-env.d.ts` file — running `make mobile`, `npx expo
+run:android`, or `npx expo start --dev-client` once generates it and the errors go away.
 
 ## 8. If something goes wrong
 
