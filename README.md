@@ -9,7 +9,7 @@ Runs end to end on a single developer machine with no cloud services required.
 | Web dashboard | Next.js 16 (App Router) + TypeScript + Tailwind v4 + TanStack Query + Recharts |
 | API | Python 3.12 + FastAPI + SQLAlchemy 2.0 + Alembic |
 | Database | PostgreSQL 15 via Docker Compose |
-| Mobile | React Native + Expo (SDK 57) + expo-router + TypeScript — the field data-entry surface, run through Expo Go. Built; not yet run on a physical device |
+| Mobile | React Native + Expo (SDK 57) + expo-router + TypeScript — the field data-entry surface. Built and verified on a physical Android device (sideloaded dev-client/release build); Expo Go itself has not yet been tried on real hardware |
 
 ## Quick start
 
@@ -79,3 +79,13 @@ by zero is a wrong chart nobody questions.
 | [`docs/start_here.md`](docs/start_here.md) | From-zero provisioning guide — OS setup, prerequisites, install, seed, and running the web dashboard and (optionally) the mobile app |
 | [`docs/how_it_works_(non-technical).md`](docs/how_it_works_(non-technical).md) | What the app does, in plain language, covering both the dashboard and the phone app, with an FAQ |
 | [`docs/how_it_works_(technical).md`](docs/how_it_works_(technical).md) | Architecture, data model, and design decisions across the backend, web dashboard and mobile app, with an FAQ |
+
+## Screenshots
+
+A barn-to-boardroom walkthrough — capture on the phone, insight on the dashboard:
+
+| | |
+|---|---|
+| ![Mobile sign-in, light theme](docs/screenshots/01-mobile-sign-in-light.png) Sign in from the barn (mobile, light) | ![Mobile weigh-in capture, dark theme](docs/screenshots/02-mobile-weigh-in-dark.png) Record a weigh-in in two taps (mobile, dark) |
+| ![Web dashboard, dark theme](docs/screenshots/03-web-dashboard-dark.png) The weigh-in updates the herd KPIs live (web, dark) | ![Web hog detail, light theme](docs/screenshots/04-web-hog-detail-light.png) Drill into that animal's growth history (web, light) |
+| ![Web exports page, dark theme](docs/screenshots/05-web-exports-dark.png) Export the evidence as CSV (web, dark) | |
