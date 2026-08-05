@@ -117,7 +117,9 @@ Running `make dev` again just attaches to the existing session instead of starti
 on the same ports. `make dev-stop` kills the tmux session only — the database container keeps
 running.
 
-**Logins** (password is the same across every seeded manager — `Bright123!`):
+**Logins** (password is the same across every seeded manager — `Bright123!`). This is what the
+documented `make seed-bulk` (default `FARMS=5`) actually creates — farm 0 is always Bright Acres
+Farm, and farms 1..n-1 take names in order from a fixed list:
 
 | Farm | Email |
 |---|---|
@@ -126,7 +128,9 @@ running.
 | Riverbend Livestock (bulk) | `manager@riverbendlivestock.com` |
 | Kano Highlands Farm (bulk) | `manager@kanohighlandsfarm.com` |
 | Oak Ridge Swine Co. (bulk) | `manager@oakridgeswineco.com` |
-| Sunrise Agro Farms (bulk) | `manager@sunriseagrofarms.com` |
+
+A sixth farm, Sunrise Agro Farms (`manager@sunriseagrofarms.com`), exists in the seed profile list
+but is **not** created by the default command above — run `make seed-bulk FARMS=6` if you want it.
 
 Note: a `viewer@brightacres.com` / `Viewer123!` read-only account is mentioned elsewhere in this
 project's history, but it is **not created by the seed command** — a fresh provision only gets
